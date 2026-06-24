@@ -38,20 +38,27 @@ void ThemeManager::apply()
         app->setStyleSheet(sheet);
     }
 
-    // Fallback palette
     QPalette pal;
     if (m_dark) {
-        pal.setColor(QPalette::Window,        QColor(30, 30, 30));
-        pal.setColor(QPalette::WindowText,    QColor(220, 220, 220));
-        pal.setColor(QPalette::Base,          QColor(18, 18, 18));
-        pal.setColor(QPalette::Text,          QColor(220, 220, 220));
-        pal.setColor(QPalette::Highlight,     QColor(58, 134, 255));
+        pal.setColor(QPalette::Window,        QColor(26, 27, 30));
+        pal.setColor(QPalette::WindowText,    QColor(228, 228, 231));
+        pal.setColor(QPalette::Base,          QColor(32, 33, 36));
+        pal.setColor(QPalette::AltBase,       QColor(39, 39, 42));
+        pal.setColor(QPalette::Text,          QColor(228, 228, 231));
+        pal.setColor(QPalette::Button,        QColor(39, 39, 42));
+        pal.setColor(QPalette::ButtonText,    QColor(228, 228, 231));
+        pal.setColor(QPalette::Highlight,     QColor(91, 110, 226));
+        pal.setColor(QPalette::HighlightedText, QColor(255, 255, 255));
     } else {
-        pal.setColor(QPalette::Window,        QColor(240, 240, 240));
-        pal.setColor(QPalette::WindowText,    Qt::black);
-        pal.setColor(QPalette::Base,          Qt::white);
-        pal.setColor(QPalette::Text,          Qt::black);
-        pal.setColor(QPalette::Highlight,     QColor(42, 130, 218));
+        pal.setColor(QPalette::Window,        QColor(255, 255, 255));
+        pal.setColor(QPalette::WindowText,    QColor(55, 65, 81));
+        pal.setColor(QPalette::Base,          QColor(249, 250, 251));
+        pal.setColor(QPalette::AltBase,       QColor(243, 244, 246));
+        pal.setColor(QPalette::Text,          QColor(55, 65, 81));
+        pal.setColor(QPalette::Button,        QColor(243, 244, 246));
+        pal.setColor(QPalette::ButtonText,    QColor(55, 65, 81));
+        pal.setColor(QPalette::Highlight,     QColor(91, 110, 226));
+        pal.setColor(QPalette::HighlightedText, QColor(255, 255, 255));
     }
     app->setPalette(pal);
 }
