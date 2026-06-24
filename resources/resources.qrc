@@ -1,0 +1,13 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="/">
+        <file>styles/dark.qss</file>
+        <file>styles/light.qss</file>
+        <file>icons/ssh.svg</file>
+        <file>icons/rdp.svg</file>
+        <file>icons/vnc.svg</file>
+        <file>icons/serial.svg</file>
+        <file>icons/telnet.svg</file>
+        <file>icons/app.svg</file>
+    </qresource>
+</RCC>

@@ -1,0 +1,64 @@
+/* SafeSSH Dark Theme */
+QMainWindow {
+    background-color: #1e1e1e;
+}
+
+QMenuBar {
+    background-color: #2d2d2d;
+    color: #dcdcdc;
+    border-bottom: 1px solid #3c3c3c;
+}
+
+QMenuBar::item:selected {
+    background-color: #3c3c3c;
+}
+
+QMenu {
+    background-color: #2d2d2d;
+    color: #dcdcdc;
+    border: 1px solid #3c3c3c;
+}
+
+QMenu::item:selected {
+    background-color: #094771;
+}
+
+QTreeView {
+    background-color: #1e1e1e;
+    color: #dcdcdc;
+    border: none;
+    alternate-background-color: #252525;
+}
+
+QTreeView::item:selected {
+    background-color: #094771;
+}
+
+QTabWidget::pane {
+    background-color: #121212;
+    border: none;
+}
+
+QTabBar::tab {
+    background-color: #2d2d2d;
+    color: #999;
+    padding: 6px 14px;
+    border: none;
+    margin-right: 2px;
+}
+
+QTabBar::tab:selected {
+    background-color: #121212;
+    color: #dcdcdc;
+}
+
+QToolBar {
+    background-color: #2d2d2d;
+    border-bottom: 1px solid #3c3c3c;
+    spacing: 4px;
+}
+
+QDockWidget {
+    color: #dcdcdc;
+    titlebar-close-icon: none;
+}
