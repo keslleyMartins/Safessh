@@ -4,11 +4,14 @@
 #include "ThemeManager.h"
 #include "SettingsDialog.h"
 #include "ConnectionDialog.h"
+#include "VaultDialog.h"
 
 #include <core/SessionManager.h>
 #include <core/SSHSession.h>
 #include <core/ProtocolHandler.h>
 #include <crypto/Vault.h>
+#include <import/TermiusImporter.h>
+#include <import/SSHConfigImporter.h>
 
 #include <QMenuBar>
 #include <QToolBar>
@@ -65,13 +68,16 @@ void MainWindow::setupMenuBar()
     connect(newConnAction, &QAction::triggered, this, &MainWindow::onNewConnection);
 
     auto* importMenu = fileMenu->addMenu(tr("&Import"));
-    importMenu->addAction(tr("From Termius..."));
-    importMenu->addAction(tr("From ~/.ssh/config..."));
+    auto* termiusAction = importMenu->addAction(tr("From Termius..."));
+    connect(termiusAction, &QAction::triggered, this, &MainWindow::onImportTermius);
+    auto* sshConfigAction = importMenu->addAction(tr("From ~/.ssh/config..."));
+    connect(sshConfigAction, &QAction::triggered, this, &MainWindow::onImportSSHConfig);
 
     fileMenu->addSeparator();
 
     auto* vaultAction = fileMenu->addAction(tr("&Unlock Vault..."));
     vaultAction->setShortcut(QKeySequence("Ctrl+Shift+V"));
+    connect(vaultAction, &QAction::triggered, this, &MainWindow::onUnlockVault);
 
     fileMenu->addSeparator();
 
@@ -192,6 +198,53 @@ void MainWindow::onDisconnectCurrent()
 
     m_sessionManager->closeSession(name);
     m_terminalTabs->closeCurrentTerminal();
+}
+
+void MainWindow::onUnlockVault()
+{
+    VaultDialog dlg(m_vault, this);
+    dlg.exec();
+
+    if (m_vault->isUnlocked()) {
+        statusBar()->showMessage(tr("Vault unlocked"), 3000);
+    }
+}
+
+void MainWindow::onImportTermius()
+{
+    auto path = QFileDialog::getOpenFileName(this, tr("Import Termius Export"),
+        QString(), tr("JSON Files (*.json);;All Files (*)"));
+    if (path.isEmpty()) return;
+
+    auto imported = importTermius(path);
+    if (imported.isEmpty()) {
+        QMessageBox::information(this, tr("Import"), tr("No connections found in file"));
+        return;
+    }
+    for (auto& c : imported)
+        m_sessionManager->addConnection(c);
+
+    QMessageBox::information(this, tr("Import"),
+        tr("Imported %1 connections from Termius").arg(imported.size()));
+}
+
+void MainWindow::onImportSSHConfig()
+{
+    auto path = QFileDialog::getOpenFileName(this, tr("Import SSH Config"),
+        QDir::homePath() + "/.ssh/config",
+        tr("All Files (*)"));
+    if (path.isEmpty()) return;
+
+    auto imported = importSSHConfig(path);
+    if (imported.isEmpty()) {
+        QMessageBox::information(this, tr("Import"), tr("No hosts found in config"));
+        return;
+    }
+    for (auto& c : imported)
+        m_sessionManager->addConnection(c);
+
+    QMessageBox::information(this, tr("Import"),
+        tr("Imported %1 hosts from SSH config").arg(imported.size()));
 }
 
 void MainWindow::wireTerminal(QObject* termObj, ProtocolHandler* session)

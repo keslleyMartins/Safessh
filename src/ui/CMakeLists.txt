@@ -3,6 +3,7 @@ add_library(safessh_ui STATIC
     ConnectionListWidget.cpp
     TerminalTabWidget.cpp
     ConnectionDialog.cpp
+    VaultDialog.cpp
     SFTPBrowser.cpp
     SettingsDialog.cpp
     ThemeManager.cpp

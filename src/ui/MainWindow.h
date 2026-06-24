@@ -17,6 +17,9 @@ private slots:
     void onNewConnection();
     void onOpenConnection(const QString& name);
     void onDisconnectCurrent();
+    void onUnlockVault();
+    void onImportTermius();
+    void onImportSSHConfig();
 
 private:
     void setupUi();
