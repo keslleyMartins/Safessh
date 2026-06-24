@@ -21,6 +21,7 @@ public:
     virtual void connect() = 0;
     virtual void disconnect() = 0;
     virtual void write(const QByteArray& data) = 0;
+    virtual void resizeTerminal(int /*cols*/, int /*rows*/) {}
     virtual SessionStats stats() const { return m_stats; }
 
 signals:

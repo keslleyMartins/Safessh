@@ -26,6 +26,7 @@ struct ConnectionConfig {
     QString      host;
     uint16_t     port = 22;
     QString      username;
+    QString      password;
     QString      identityFile;
     AuthMethod   authMethod = AuthMethod::Password;
     QString      vaultEntryId;

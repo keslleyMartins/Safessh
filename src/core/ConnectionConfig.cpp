@@ -47,6 +47,7 @@ QJsonObject ConnectionConfig::toJson() const {
     o["host"]         = host;
     o["port"]         = port;
     o["username"]     = username;
+    o["password"]     = password;
     o["identityFile"] = identityFile;
     o["authMethod"]   = authName(authMethod);
     o["vaultEntryId"] = vaultEntryId;
@@ -67,6 +68,7 @@ ConnectionConfig ConnectionConfig::fromJson(const QJsonObject& o) {
     c.host         = o["host"].toString();
     c.port         = static_cast<uint16_t>(o["port"].toInt(22));
     c.username     = o["username"].toString();
+    c.password     = o["password"].toString();
     c.identityFile = o["identityFile"].toString();
     c.authMethod   = authFromName(o["authMethod"].toString());
     c.vaultEntryId = o["vaultEntryId"].toString();

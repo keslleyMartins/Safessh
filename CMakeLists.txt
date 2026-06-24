@@ -62,7 +62,11 @@ FetchContent_MakeAvailable(
     nlohmann_json
     spdlog
     libsodium
+    libssh
 )
+
+# libssh needs its CMake config path set
+list(PREPEND CMAKE_PREFIX_PATH ${libssh_BINARY_DIR})
 
 # ─── Qt6 ─────────────────────────────────────────────────────────────────────
 

@@ -2,10 +2,12 @@
 #include "ConnectionListWidget.h"
 #include "TerminalTabWidget.h"
 #include "ThemeManager.h"
-#include "ui/SettingsDialog.h"
-#include "ui/ConnectionDialog.h"
+#include "SettingsDialog.h"
+#include "ConnectionDialog.h"
 
 #include <core/SessionManager.h>
+#include <core/SSHSession.h>
+#include <core/ProtocolHandler.h>
 #include <crypto/Vault.h>
 
 #include <QMenuBar>
@@ -17,6 +19,10 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QCloseEvent>
+#include <QStandardPaths>
+#include <QDir>
+#include <QFileInfo>
+#include <QTermWidget>
 #include <spdlog/spdlog.h>
 
 MainWindow::MainWindow(QWidget* parent)
@@ -56,6 +62,7 @@ void MainWindow::setupMenuBar()
 
     auto* newConnAction = fileMenu->addAction(tr("&New Connection..."));
     newConnAction->setShortcut(QKeySequence("Ctrl+N"));
+    connect(newConnAction, &QAction::triggered, this, &MainWindow::onNewConnection);
 
     auto* importMenu = fileMenu->addMenu(tr("&Import"));
     importMenu->addAction(tr("From Termius..."));
@@ -69,7 +76,7 @@ void MainWindow::setupMenuBar()
     fileMenu->addSeparator();
 
     auto* settingsAction = fileMenu->addAction(tr("&Settings..."));
-    settingsAction->setShortcut(QKeySequence("Ctrl+,"));
+    settingsAction->setShortcut(QKeySequence("Ctrl,+"));
     connect(settingsAction, &QAction::triggered, this, [this]() {
         SettingsDialog dlg(m_themeManager, this);
         dlg.exec();
@@ -85,10 +92,20 @@ void MainWindow::setupToolBar()
 {
     auto* toolbar = addToolBar(tr("Main"));
     toolbar->setMovable(false);
-    toolbar->addAction(tr("New"));
-    toolbar->addAction(tr("Connect"));
+
+    auto* newAction = toolbar->addAction(tr("New"));
+    connect(newAction, &QAction::triggered, this, &MainWindow::onNewConnection);
+
+    auto* connectAction = toolbar->addAction(tr("Connect"));
+    connect(connectAction, &QAction::triggered, this, [this]() {
+        auto selected = m_connectionList->selectedConnection();
+        if (!selected.isEmpty()) onOpenConnection(selected);
+    });
+
     toolbar->addSeparator();
-    toolbar->addAction(tr("Disconnect"));
+
+    auto* disconnectAction = toolbar->addAction(tr("Disconnect"));
+    connect(disconnectAction, &QAction::triggered, this, &MainWindow::onDisconnectCurrent);
 }
 
 void MainWindow::setupDockWidgets()
@@ -103,9 +120,7 @@ void MainWindow::setupDockWidgets()
 void MainWindow::connectSignals()
 {
     connect(m_connectionList, &ConnectionListWidget::connectionActivated,
-            this, [this](const QString& name) {
-                m_sessionManager->openSession(name);
-            });
+            this, &MainWindow::onOpenConnection);
 }
 
 void MainWindow::loadSettings()
@@ -113,6 +128,10 @@ void MainWindow::loadSettings()
     QSettings s("SafeSSH", "SafeSSH");
     restoreGeometry(s.value("geometry").toByteArray());
     restoreState(s.value("windowState").toByteArray());
+
+    auto configPath = s.value("configPath").toString();
+    if (!configPath.isEmpty())
+        m_sessionManager->loadConnections(configPath);
 }
 
 void MainWindow::saveSettings()
@@ -120,4 +139,84 @@ void MainWindow::saveSettings()
     QSettings s("SafeSSH", "SafeSSH");
     s.setValue("geometry", saveGeometry());
     s.setValue("windowState", saveState());
+
+    auto configPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
+                      + "/connections.json";
+    QDir().mkpath(QFileInfo(configPath).absolutePath());
+    m_sessionManager->saveConnections(configPath);
+    s.setValue("configPath", configPath);
+}
+
+// ── Slots ─────────────────────────────────────────────────────────────────
+
+void MainWindow::onNewConnection()
+{
+    ConnectionDialog dlg(this);
+    if (dlg.exec() != QDialog::Accepted) return;
+
+    auto cfg = dlg.config();
+    if (cfg.name.isEmpty()) {
+        QMessageBox::warning(this, tr("Error"), tr("Connection name cannot be empty"));
+        return;
+    }
+    m_sessionManager->addConnection(cfg);
+}
+
+void MainWindow::onOpenConnection(const QString& name)
+{
+    auto* cfg = m_sessionManager->findConnection(name);
+    if (!cfg) return;
+
+    if (m_sessionManager->activeSession(name)) {
+        m_terminalTabs->setCurrentIndex(m_terminalTabs->findTab(name));
+        return;
+    }
+
+    auto* session = m_sessionManager->openSession(name);
+    if (!session) return;
+
+    auto* term = m_terminalTabs->openTerminal(name);
+    if (!term) return;
+
+    wireTerminal(term, session);
+
+    session->connect();
+}
+
+void MainWindow::onDisconnectCurrent()
+{
+    auto* term = m_terminalTabs->currentTerminal();
+    if (!term) return;
+    auto name = m_terminalTabs->currentTabName();
+    if (name.isEmpty()) return;
+
+    m_sessionManager->closeSession(name);
+    m_terminalTabs->closeCurrentTerminal();
+}
+
+void MainWindow::wireTerminal(QObject* termObj, ProtocolHandler* session)
+{
+    auto* term = qobject_cast<QTermWidget*>(termObj);
+    if (!term) return;
+
+    // User types → send to SSH session
+    connect(term, &QTermWidget::sendData, this, [session](const char* data, int size) {
+        session->write(QByteArray(data, size));
+    });
+
+    // SSH receives data → display in terminal
+    connect(session, &ProtocolHandler::dataReceived, term, [term](const QByteArray& data) {
+        term->putData(data.constData(), data.size());
+    });
+
+    // Connection errors → show in terminal
+    connect(session, &ProtocolHandler::errorOccurred, term, [term](const QString& msg) {
+        auto err = msg.toUtf8();
+        term->putData(err.constData(), err.size());
+    });
+
+    // Terminal resize → notify session
+    connect(term, &QTermWidget::ptySizeChanged, this, [session](int cols, int rows) {
+        session->resizeTerminal(cols, rows);
+    });
 }

@@ -20,6 +20,7 @@ private:
     QLineEdit* m_hostEdit       = nullptr;
     QSpinBox*  m_portSpin       = nullptr;
     QLineEdit* m_userEdit       = nullptr;
+    QLineEdit* m_passwordEdit   = nullptr;
     QComboBox* m_authCombo      = nullptr;
     QLineEdit* m_identityEdit   = nullptr;
     QLineEdit* m_groupEdit      = nullptr;

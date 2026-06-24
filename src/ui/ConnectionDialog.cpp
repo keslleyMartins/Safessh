@@ -24,6 +24,8 @@ ConnectionDialog::ConnectionDialog(QWidget* parent)
     m_portSpin->setRange(1, 65535);
     m_portSpin->setValue(22);
     m_userEdit      = new QLineEdit(this);
+    m_passwordEdit  = new QLineEdit(this);
+    m_passwordEdit->setEchoMode(QLineEdit::Password);
     m_authCombo     = new QComboBox(this);
     m_authCombo->addItems({"Password", "Key File", "Agent", "Interactive", "GSSAPI", "None"});
     m_identityEdit  = new QLineEdit(this);
@@ -38,6 +40,7 @@ ConnectionDialog::ConnectionDialog(QWidget* parent)
     form->addRow(tr("Host:"),       m_hostEdit);
     form->addRow(tr("Port:"),       m_portSpin);
     form->addRow(tr("Username:"),   m_userEdit);
+    form->addRow(tr("Password:"),   m_passwordEdit);
     form->addRow(tr("Auth:"),       m_authCombo);
     form->addRow(tr("Identity:"),   m_identityEdit);
     form->addRow(tr("Group:"),      m_groupEdit);
@@ -67,6 +70,7 @@ ConnectionConfig ConnectionDialog::config() const
     c.host         = m_hostEdit->text();
     c.port         = static_cast<uint16_t>(m_portSpin->value());
     c.username     = m_userEdit->text();
+    c.password     = m_passwordEdit->text();
     c.authMethod   = static_cast<AuthMethod>(m_authCombo->currentIndex());
     c.identityFile = m_identityEdit->text();
     c.group        = m_groupEdit->text();
@@ -81,6 +85,7 @@ void ConnectionDialog::setConfig(const ConnectionConfig& cfg)
     m_hostEdit->setText(cfg.host);
     m_portSpin->setValue(cfg.port);
     m_userEdit->setText(cfg.username);
+    m_passwordEdit->setText(cfg.password);
     m_authCombo->setCurrentIndex(static_cast<int>(cfg.authMethod));
     m_identityEdit->setText(cfg.identityFile);
     m_groupEdit->setText(cfg.group);

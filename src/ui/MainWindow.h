@@ -13,6 +13,11 @@ public:
     explicit MainWindow(QWidget* parent = nullptr);
     ~MainWindow() override;
 
+private slots:
+    void onNewConnection();
+    void onOpenConnection(const QString& name);
+    void onDisconnectCurrent();
+
 private:
     void setupUi();
     void setupMenuBar();
@@ -21,6 +26,8 @@ private:
     void connectSignals();
     void loadSettings();
     void saveSettings();
+
+    void wireTerminal(QObject* term, class ProtocolHandler* session);
 
     SessionManager*       m_sessionManager = nullptr;
     Vault*                m_vault = nullptr;

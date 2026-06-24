@@ -17,6 +17,7 @@ target_link_libraries(safessh_core PUBLIC
     Qt6::SerialPort
     nlohmann_json::nlohmann_json
     spdlog::spdlog
+    libssh::libssh
 )
 
 safessh_set_warnings(safessh_core)

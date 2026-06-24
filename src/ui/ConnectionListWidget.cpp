@@ -44,6 +44,16 @@ static QString protocolIcon(ProtocolType p)
     return "ssh";
 }
 
+QString ConnectionListWidget::selectedConnection() const
+{
+    auto idx = m_treeView->currentIndex();
+    if (!idx.isValid()) return {};
+    if (auto* item = m_model->itemFromIndex(idx)) {
+        return item->data(Qt::UserRole).toString();
+    }
+    return {};
+}
+
 void ConnectionListWidget::rebuildTree()
 {
     m_model->clear();

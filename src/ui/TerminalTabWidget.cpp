@@ -43,3 +43,31 @@ void TerminalTabWidget::closeTerminal(int index)
     removeTab(index);
     w->deleteLater();
 }
+
+void TerminalTabWidget::closeCurrentTerminal()
+{
+    int idx = currentIndex();
+    if (idx >= 0) closeTerminal(idx);
+}
+
+QTermWidget* TerminalTabWidget::currentTerminal() const
+{
+    auto* w = currentWidget();
+    if (!w) return nullptr;
+    return w->findChild<QTermWidget*>();
+}
+
+QString TerminalTabWidget::currentTabName() const
+{
+    int idx = currentIndex();
+    if (idx < 0) return {};
+    return tabText(idx);
+}
+
+int TerminalTabWidget::findTab(const QString& title) const
+{
+    for (int i = 0; i < count(); ++i) {
+        if (tabText(i) == title) return i;
+    }
+    return -1;
+}

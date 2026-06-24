@@ -10,6 +10,8 @@ class ConnectionListWidget : public QWidget {
 public:
     explicit ConnectionListWidget(SessionManager* mgr, QWidget* parent = nullptr);
 
+    QString selectedConnection() const;
+
 signals:
     void connectionActivated(const QString& name);
     void connectionContextMenu(const QString& name);
