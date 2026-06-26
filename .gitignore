@@ -1,30 +1,19 @@
-# Build
-build/
-cmake-build-*/
-out/
+# Rust / Cargo
+src-tauri/target/
+src-tauri/gen/
+
+# Node
+node_modules/
+dist/
+.pnpm-store/
 
 # IDE
 .vscode/
 .idea/
-*.user
-*.pro.user*
-CMakeUserPresets.json
+*.swp
+*.swo
+*~
 
-# Compiled
-*.o
-*.obj
-*.exe
-*.dll
-*.so
-*.dylib
-*.lib
-*.a
-
-# Qt
-*.moc
-moc_*.cpp
-qrc_*.cpp
-ui_*.h
-
-# Dependencies (fetched by CMake)
-_deps/
+# OS
+.DS_Store
+Thumbs.db
