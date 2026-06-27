@@ -35,6 +35,8 @@ export default function Terminal({ connection, password, onReady, onDisconnect }
   const [stageMsg, setStageMsg] = useState("");
   const [showOverlay, setShowOverlay] = useState(true);
 
+  const connectedRef = useRef(false);
+
   const cleanup = useCallback(async () => {
     for (const un of unlistenersRef.current) un();
     unlistenersRef.current = [];
@@ -99,6 +101,7 @@ export default function Terminal({ connection, password, onReady, onDisconnect }
     // ── Listeners BEFORE connect (race condition fix) ──
     const setupListeners = async () => {
       const unData = await listen<number[]>(`ssh-data-${sessionId}`, (e) => {
+        connectedRef.current = true;
         setStage("connected");
         setShowOverlay(false);
         if (!reportedRef.current) {
@@ -175,6 +178,7 @@ export default function Terminal({ connection, password, onReady, onDisconnect }
 
     // Paste on right-click
     const handleCtx = (e: MouseEvent) => {
+      if (!connectedRef.current) return;
       e.preventDefault();
       navigator.clipboard.readText().then((t) => {
         invoke("ssh_write", { sessionId, data: Array.from(t).map((c) => c.charCodeAt(0)) }).catch(() => {});
@@ -184,6 +188,7 @@ export default function Terminal({ connection, password, onReady, onDisconnect }
 
     // Paste on middle-click / double-tap touchpad
     const handleMousedown = (e: MouseEvent) => {
+      if (!connectedRef.current) return;
       if (e.button === 1) {
         e.preventDefault();
         navigator.clipboard.readText().then((t) => {
@@ -194,6 +199,7 @@ export default function Terminal({ connection, password, onReady, onDisconnect }
     container.addEventListener("mousedown", handleMousedown);
 
     term.onData((data) => {
+      if (!connectedRef.current) return; // protection: block until connected
       const bytes = Array.from(data).map((c) => c.charCodeAt(0));
       invoke("ssh_write", { sessionId, data: bytes }).catch(() => {});
     });

@@ -4,6 +4,7 @@ import type { ConnectionConfig, ProtocolType } from "../lib/types";
 interface Props {
   onSave: (cfg: ConnectionConfig) => void;
   onClose: () => void;
+  editConfig?: ConnectionConfig | null;
 }
 
 const defaultPorts: Record<ProtocolType, number> = {
@@ -14,16 +15,16 @@ const defaultPorts: Record<ProtocolType, number> = {
   vnc: 5900,
 };
 
-export default function ConnectionDialog({ onSave, onClose }: Props) {
-  const [protocol, setProtocol] = useState<ProtocolType>("ssh");
-  const [name, setName] = useState("");
-  const [host, setHost] = useState("");
-  const [port, setPort] = useState(22);
-  const [username, setUsername] = useState("");
+export default function ConnectionDialog({ onSave, onClose, editConfig }: Props) {
+  const [protocol, setProtocol] = useState<ProtocolType>(editConfig?.protocol || "ssh");
+  const [name, setName] = useState(editConfig?.name || "");
+  const [host, setHost] = useState(editConfig?.host || "");
+  const [port, setPort] = useState(editConfig?.port || 22);
+  const [username, setUsername] = useState(editConfig?.username || "");
   const [password, setPassword] = useState("");
-  const [authMethod, setAuthMethod] = useState("password");
-  const [identityFile, setIdentityFile] = useState("");
-  const [group, setGroup] = useState("");
+  const [authMethod, setAuthMethod] = useState(editConfig?.authMethod || "password");
+  const [identityFile, setIdentityFile] = useState(editConfig?.identityFile || "");
+  const [group, setGroup] = useState(editConfig?.group || "");
   const timeoutSec = 10;
 
   function handleProtocolChange(p: string) {

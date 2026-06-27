@@ -641,6 +641,93 @@ body,
   }
 }
 
+/* ─── Context Menu ─────────────────────────────────────────────────── */
+.ctx-menu {
+  position: fixed;
+  z-index: 1000;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px;
+  min-width: 160px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  animation: ctxFade 0.12s ease;
+}
+
+@keyframes ctxFade {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.1s;
+  user-select: none;
+}
+
+.ctx-item:hover {
+  background: var(--bg-hover);
+}
+
+.ctx-item.danger {
+  color: var(--danger);
+}
+
+.ctx-item.danger:hover {
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.ctx-icon {
+  display: flex;
+  align-items: center;
+  width: 18px;
+  height: 18px;
+  color: var(--text-muted);
+}
+
+.ctx-item.danger .ctx-icon {
+  color: var(--danger);
+}
+
+.ctx-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 8px;
+}
+
+/* ─── SFTP Placeholder ────────────────────────────────────────────── */
+.sftp-placeholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--text-muted);
+}
+
+.sftp-placeholder svg {
+  width: 48px;
+  height: 48px;
+  opacity: 0.4;
+}
+
+.sftp-placeholder p {
+  font-size: 16px;
+  color: var(--text-secondary);
+}
+
+.sftp-placeholder span {
+  font-size: 13px;
+}
+
 /* ─── Folder/group in connection list ─────────────────────────────── */
 .conn-group-header {
   padding: 10px 12px 4px;
