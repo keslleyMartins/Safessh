@@ -1,18 +1,36 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
+import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { ConnectionConfig } from "../lib/types";
 
 interface Props {
-  sessionId: string;
   connection: ConnectionConfig;
+  password?: string;
   onDisconnect: () => void;
 }
 
-export default function Terminal({ sessionId, connection, onDisconnect }: Props) {
+export default function Terminal({ connection, password, onDisconnect }: Props) {
   const termRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
+  const sessionRef = useRef<string | null>(null);
+  const unlistenersRef = useRef<UnlistenFn[]>([]);
+
+  const cleanup = useCallback(async () => {
+    for (const un of unlistenersRef.current) {
+      un();
+    }
+    unlistenersRef.current = [];
+
+    if (sessionRef.current) {
+      try {
+        await invoke("ssh_disconnect", { sessionId: sessionRef.current });
+      } catch {}
+      sessionRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     if (!termRef.current) return;
@@ -49,37 +67,100 @@ export default function Terminal({ sessionId, connection, onDisconnect }: Props)
 
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
-
     term.open(termRef.current);
     fitAddon.fit();
 
-    term.write(`\x1b[32mConnecting to ${connection.host}:${connection.port}...\x1b[0m\r\n`);
-
-    // Listen for resize
     const handleResize = () => fitAddon.fit();
     window.addEventListener("resize", handleResize);
 
-    // TODO: wire up Tauri events and commands
-    // For now, show a placeholder
-    setTimeout(() => {
-      term.write(`\r\n\x1b[33mWelcome to SafeSSH\x1b[0m\r\n`);
-      term.write(`Connected to \x1b[36m${connection.username}@${connection.host}\x1b[0m\r\n\r\n`);
-      term.write(`\x1b[32m$\x1b[0m `);
-    }, 500);
+    const connectSSH = async () => {
+      term.write("\x1b[32mConnecting...\x1b[0m\r\n");
+      try {
+        const sessionId = await invoke<string>("ssh_connect", {
+          conn: {
+            name: connection.name,
+            host: connection.host,
+            port: connection.port,
+            username: connection.username,
+            auth_method: connection.authMethod || "password",
+            identity_file: connection.identityFile || null,
+            proxy_host: null,
+            proxy_port: null,
+          },
+          password: password || connection.password || null,
+        });
 
-    // Handle user input
+        sessionRef.current = sessionId;
+
+        const unlistenData = await listen<number[]>(
+          `ssh-data-${sessionId}`,
+          (event) => {
+            const bytes = new Uint8Array(event.payload);
+            term.write(bytes);
+          }
+        );
+        unlistenersRef.current.push(unlistenData);
+
+        const unlistenError = await listen<string>(
+          `ssh-error-${sessionId}`,
+          (event) => {
+            term.write(`\r\n\x1b[31m${event.payload}\x1b[0m\r\n`);
+          }
+        );
+        unlistenersRef.current.push(unlistenError);
+
+        const unlistenDisconnected = await listen(
+          `ssh-disconnected-${sessionId}`,
+          () => {
+            term.write("\r\n\x1b[33mDisconnected\x1b[0m\r\n");
+          }
+        );
+        unlistenersRef.current.push(unlistenDisconnected);
+
+        const unlistenConnected = await listen(
+          `ssh-connected-${sessionId}`,
+          () => {
+            term.write(""); // connected signal received
+          }
+        );
+        unlistenersRef.current.push(unlistenConnected);
+      } catch (e) {
+        term.write(`\r\n\x1b[31mConnection failed: ${e}\x1b[0m\r\n`);
+      }
+    };
+
+    connectSSH();
+
+    // User input → send to SSH session
     term.onData((data) => {
-      // TODO: send to Tauri backend
-      term.write(data);
+      if (sessionRef.current) {
+        const bytes = Array.from(data).map((c) => c.charCodeAt(0));
+        invoke("ssh_write", {
+          sessionId: sessionRef.current,
+          data: bytes,
+        }).catch(() => {});
+      }
+    });
+
+    // Resize → notify SSH
+    term.onResize(({ cols, rows }) => {
+      if (sessionRef.current) {
+        invoke("ssh_resize", {
+          sessionId: sessionRef.current,
+          cols,
+          rows,
+        }).catch(() => {});
+      }
     });
 
     xtermRef.current = term;
 
     return () => {
       window.removeEventListener("resize", handleResize);
+      cleanup();
       term.dispose();
     };
-  }, [sessionId, connection]);
+  }, [connection, password, cleanup]);
 
   return (
     <div className="terminal-wrapper">

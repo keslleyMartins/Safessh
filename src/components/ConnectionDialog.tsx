@@ -24,7 +24,7 @@ export default function ConnectionDialog({ onSave, onClose }: Props) {
   const [authMethod, setAuthMethod] = useState("password");
   const [identityFile, setIdentityFile] = useState("");
   const [group, setGroup] = useState("");
-  const [timeout, setTimeout_] = useState(10);
+  const timeoutSec = 10;
 
   function handleProtocolChange(p: string) {
     const proto = p as ProtocolType;
@@ -44,7 +44,7 @@ export default function ConnectionDialog({ onSave, onClose }: Props) {
       authMethod,
       identityFile,
       group,
-      timeout,
+      timeout: timeoutSec,
     });
   }
 

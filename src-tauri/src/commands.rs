@@ -56,11 +56,11 @@ pub async fn ssh_connect(
     event_window: tauri::Window,
 ) -> Result<String, String> {
     let session_id = uuid::Uuid::new_v4().to_string();
-    let mut sessions = state.ssh_sessions.lock().map_err(|e| e.to_string())?;
 
     let mut ssh = SshSession::new(session_id.clone());
     ssh.connect(&conn, password, event_window.clone()).await?;
 
+    let mut sessions = state.ssh_sessions.lock().map_err(|e| e.to_string())?;
     sessions.push(ssh);
     Ok(session_id)
 }
@@ -111,7 +111,7 @@ pub async fn vault_create(
     state: State<'_, AppState>,
     password: String,
 ) -> Result<(), String> {
-    let mut v = Vault::new(&password).map_err(|e| e.to_string())?;
+    let v = Vault::new(&password).map_err(|e| e.to_string())?;
     v.save().map_err(|e| e.to_string())?;
     let mut vault = state.vault.lock().map_err(|e| e.to_string())?;
     *vault = Some(v);
@@ -179,7 +179,7 @@ pub async fn vault_remove(
 
 #[tauri::command]
 pub async fn serial_list_ports() -> Result<Vec<String>, String> {
-    serial::list_ports().map_err(|e| e.to_string())
+    crate::serial::list_ports().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -192,7 +192,7 @@ pub async fn serial_connect(
     let session_id = uuid::Uuid::new_v4().to_string();
     let mut sessions = state.serial_sessions.lock().map_err(|e| e.to_string())?;
 
-    let serial = SerialSession::new(session_id.clone(), event_window.clone());
+    let mut serial = SerialSession::new(session_id.clone(), event_window.clone());
     serial.connect(&port_name, baud_rate)?;
 
     sessions.push(serial);

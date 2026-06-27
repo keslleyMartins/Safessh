@@ -1,9 +1,10 @@
 use aes_gcm::{Aes256Gcm, Key, Nonce};
 use aes_gcm::aead::{Aead, KeyInit, OsRng};
-use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
+use argon2::{Argon2, PasswordHasher};
 use argon2::password_hash::SaltString;
 use serde::{Deserialize, Serialize};
 use base64::Engine;
+use rand::RngCore;
 
 use crate::commands::VaultEntry;
 

@@ -1,5 +1,6 @@
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::mpsc;
 use std::thread;
 use std::io::{Read, Write};
 use ssh2::Session;
@@ -78,7 +79,6 @@ impl SshSession {
                             .unwrap_or_default()
                     });
                     session.userauth_pubkey_file(&username, None, std::path::Path::new(&path), password.as_deref())
-                    session.userauth_pubkey_file(&username, None, std::path::Path::new(&path), password.as_deref())
                 }
                 _ => {
                     if let Some(pw) = &password {
@@ -112,7 +112,7 @@ impl SshSession {
                 return;
             }
 
-            channel.set_blocking(false);
+            session.set_blocking(false);
             let _ = window.emit(&format!("ssh-connected-{}", session_id), ());
 
             let mut buf = [0u8; 32768];

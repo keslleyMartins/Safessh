@@ -3,7 +3,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
 use log::info;
-use serialport::SerialPort;
 use tauri::Emitter;
 
 pub struct SerialSession {

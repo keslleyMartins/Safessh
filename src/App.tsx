@@ -64,7 +64,6 @@ export default function App() {
         <main className="main-content">
           {activeSession ? (
             <Terminal
-              sessionId={activeSession}
               connection={connections.find((c) => c.name === activeSession)!}
               onDisconnect={handleDisconnect}
             />
