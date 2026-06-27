@@ -74,31 +74,16 @@ export default function Terminal({ connection, password, onReady, onDisconnect, 
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
 
-    // Defer opening until container has size
-    const init = () => {
-      try {
-        term.open(container);
-        fitAddon.fit();
-      } catch {}
-    };
+    term.open(container);
 
-    if (container.clientWidth > 0 && container.clientHeight > 0) {
-      init();
-    } else {
-      const ro = new ResizeObserver((entries) => {
-        const e = entries[0];
-        if (e.contentRect.width > 0 && e.contentRect.height > 0) {
-          init();
-          ro.disconnect();
-        }
-      });
-      ro.observe(container);
-    }
-
-    const resizeRo = new ResizeObserver(() => {
+    // Force fit after DOM settles
+    const doFit = () => {
       try { fitAddon.fit(); } catch {}
-    });
-    resizeRo.observe(container);
+    };
+    requestAnimationFrame(() => requestAnimationFrame(doFit));
+
+    const ro = new ResizeObserver(doFit);
+    ro.observe(container);
 
     // ── Listeners BEFORE connect (race condition fix) ──
     const setupListeners = async () => {
@@ -219,7 +204,7 @@ export default function Terminal({ connection, password, onReady, onDisconnect, 
     xtermRef.current = term;
 
     return () => {
-      resizeRo.disconnect();
+      ro.disconnect();
       cleanup();
       invoke("ssh_disconnect", { sessionId }).catch(() => {});
       term.dispose();
@@ -249,7 +234,7 @@ export default function Terminal({ connection, password, onReady, onDisconnect, 
           )}
         </div>
       )}
-      <div className="terminal-container" ref={termRef} style={{ height: "100%" }} />
+      <div className="terminal-container" ref={termRef} />
     </div>
   );
 }
