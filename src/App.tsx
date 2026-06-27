@@ -5,11 +5,7 @@ import ConnectionDialog from "./components/ConnectionDialog";
 import VaultDialog from "./components/VaultDialog";
 import type { ConnectionConfig } from "./lib/types";
 
-interface Tab {
-  id: string;
-  conn: ConnectionConfig;
-}
-
+interface Tab { id: string; conn: ConnectionConfig }
 type Toast = { type: "success" | "error"; msg: string } | null;
 
 export default function App() {
@@ -23,75 +19,51 @@ export default function App() {
 
   useEffect(() => {
     (async () => {
-      try {
-        const raw = await invoke<string>("load_connections");
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) setConnections(parsed);
-      } catch {}
+      try { setConnections(JSON.parse(await invoke("load_connections"))); }
+      catch {}
     })();
   }, []);
 
   useEffect(() => {
     (async () => {
-      try {
-        await invoke("save_connections", { data: JSON.stringify(connections, null, 2) });
-      } catch (e) { console.error("save failed", e); }
+      try { await invoke("save_connections", { data: JSON.stringify(connections) }); }
+      catch (e) { console.error("save", e); }
     })();
   }, [connections]);
 
   useEffect(() => {
     if (!toast) return;
-    const timer = setTimeout(() => setToast(null), 3500);
-    return () => clearTimeout(timer);
+    const t = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(t);
   }, [toast]);
 
-  const showToast = useCallback((type: "success" | "error", msg: string) => {
-    setToast({ type, msg });
-  }, []);
-
-  const handleTerminalReady = useCallback((ok: boolean, msg: string) => {
-    showToast(ok ? "success" : "error", msg);
-  }, [showToast]);
+  const showToast = useCallback((type: "success" | "error", msg: string) => setToast({ type, msg }), []);
+  const handleTerminalReady = useCallback((ok: boolean, msg: string) => showToast(ok ? "success" : "error", msg), [showToast]);
 
   const openTab = useCallback((conn: ConnectionConfig) => {
     const existing = tabs.find((t) => t.conn.name === conn.name);
-    if (existing) {
-      setActiveTab(existing.id);
-      return;
-    }
-    const tabId = crypto.randomUUID();
-    setTabs((prev) => [...prev, { id: tabId, conn }]);
-    setActiveTab(tabId);
+    if (existing) { setActiveTab(existing.id); return; }
+    const id = crypto.randomUUID();
+    setTabs((p) => [...p, { id, conn }]);
+    setActiveTab(id);
   }, [tabs]);
 
   const closeTab = useCallback((tabId: string) => {
     setTabs((prev) => {
       const idx = prev.findIndex((t) => t.id === tabId);
       const next = prev.filter((t) => t.id !== tabId);
-      if (activeTab === tabId) {
-        if (next.length > 0) {
-          const newIdx = Math.min(idx, next.length - 1);
-          setActiveTab(next[newIdx].id);
-        } else {
-          setActiveTab(null);
-        }
-      }
+      if (activeTab === tabId) setActiveTab(next.length > 0 ? next[Math.min(idx, next.length - 1)].id : null);
       return next;
     });
   }, [activeTab]);
 
   const handleCreateConnection = useCallback((cfg: ConnectionConfig) => {
-    const finalCfg = { ...cfg, name: cfg.name.trim() || cfg.host };
-    setConnections((prev) => [...prev, finalCfg]);
+    setConnections((p) => [...p, { ...cfg, name: cfg.name.trim() || cfg.host }]);
     setShowNewConn(false);
   }, []);
 
-  const handleVaultUnlocked = useCallback(() => {
-    setVaultUnlocked(true);
-    setShowVault(false);
-  }, []);
+  const handleVaultUnlocked = useCallback(() => { setVaultUnlocked(true); setShowVault(false); }, []);
 
-  // Group connections
   const groups = new Map<string, ConnectionConfig[]>();
   for (const c of connections) {
     const g = c.group?.trim() || "Ungrouped";
@@ -103,7 +75,6 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      {/* ── Toolbar ── */}
       <header className="app-toolbar">
         <div className="toolbar-left">
           <button className="tb-btn" onClick={() => setShowNewConn(true)}>+ New Connection</button>
@@ -118,37 +89,22 @@ export default function App() {
         </div>
       </header>
 
-      {/* ── Browser-like Tabs ── */}
       {tabs.length > 0 && (
         <div className="browser-tabs">
+          <button className="browser-tab home-btn" onClick={() => setActiveTab(null)} title="Home">{"\u{1F3E0}"}</button>
           {tabs.map((tab) => (
-            <div
-              key={tab.id}
-              className={`browser-tab ${activeTab === tab.id ? "active" : ""}`}
-              onClick={() => setActiveTab(tab.id)}
-            >
+            <div key={tab.id} className={`browser-tab ${activeTab === tab.id ? "active" : ""}`} onClick={() => setActiveTab(tab.id)}>
               <span className="browser-tab-icon">{"\u{1F512}"}</span>
               <span className="browser-tab-title">{tab.conn.name}</span>
-              <button
-                className="browser-tab-close"
-                onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}
-              >
-                &times;
-              </button>
+              <button className="browser-tab-close" onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}>&times;</button>
             </div>
           ))}
         </div>
       )}
 
-      {/* ── Content Area ── */}
       <div className="app-content">
         {activeTabData ? (
-          <Terminal
-            key={activeTabData.id}
-            connection={activeTabData.conn}
-            onReady={handleTerminalReady}
-            onDisconnect={() => closeTab(activeTabData.id)}
-          />
+          <Terminal key={activeTabData.id} connection={activeTabData.conn} onReady={handleTerminalReady} onDisconnect={() => closeTab(activeTabData.id)} />
         ) : (
           <div className="conn-browser">
             <div className="conn-browser-header">
@@ -160,9 +116,7 @@ export default function App() {
               <div className="conn-browser-empty">
                 <div className="empty-icon">{"\u{1F4C2}"}</div>
                 <p>No connections yet</p>
-                <button className="btn btn-primary" onClick={() => setShowNewConn(true)}>
-                  + Create your first connection
-                </button>
+                <button className="btn btn-primary" onClick={() => setShowNewConn(true)}>+ Create your first connection</button>
               </div>
             ) : (
               <div className="conn-browser-grid">
@@ -175,23 +129,13 @@ export default function App() {
                     </div>
                     <div className="conn-folder-items">
                       {conns.map((c) => (
-                        <div
-                          key={c.name}
-                          className="conn-browser-item"
-                          onClick={() => openTab(c)}
-                        >
+                        <div key={c.name} className="conn-browser-item" onClick={() => openTab(c)}>
                           <div className={`conn-browser-icon ${c.protocol}`}>
-                            {c.protocol === "ssh" ? "\u{1F512}" :
-                             c.protocol === "telnet" ? "\u{1F4E1}" :
-                             c.protocol === "serial" ? "\u{1F4BB}" :
-                             c.protocol === "rdp" ? "\u{1F5A5}" :
-                             c.protocol === "vnc" ? "\u{1F4FA}" : "\u{1F310}"}
+                            {c.protocol === "ssh" ? "\u{1F512}" : c.protocol === "telnet" ? "\u{1F4E1}" : c.protocol === "serial" ? "\u{1F4BB}" : c.protocol === "rdp" ? "\u{1F5A5}" : "\u{1F4FA}"}
                           </div>
                           <div className="conn-browser-info">
                             <div className="conn-browser-name">{c.name}</div>
-                            <div className="conn-browser-meta">
-                              {c.username ? `${c.username}@` : ""}{c.host}:{c.port}
-                            </div>
+                            <div className="conn-browser-meta">{c.username ? `${c.username}@` : ""}{c.host}:{c.port}</div>
                           </div>
                         </div>
                       ))}
@@ -204,28 +148,9 @@ export default function App() {
         )}
       </div>
 
-      {showNewConn && (
-        <ConnectionDialog
-          onSave={handleCreateConnection}
-          onClose={() => setShowNewConn(false)}
-        />
-      )}
-
-      {showVault && (
-        <VaultDialog
-          onUnlocked={handleVaultUnlocked}
-          onClose={() => setShowVault(false)}
-        />
-      )}
-
-      {toast && (
-        <div className={`toast ${toast.type}`}>
-          <span className="toast-icon">
-            {toast.type === "success" ? "\u2713" : "\u2717"}
-          </span>
-          <span className="toast-msg">{toast.msg}</span>
-        </div>
-      )}
+      {showNewConn && <ConnectionDialog onSave={handleCreateConnection} onClose={() => setShowNewConn(false)} />}
+      {showVault && <VaultDialog onUnlocked={handleVaultUnlocked} onClose={() => setShowVault(false)} />}
+      {toast && <div className={`toast ${toast.type}`}><span className="toast-icon">{toast.type === "success" ? "\u2713" : "\u2717"}</span><span className="toast-msg">{toast.msg}</span></div>}
     </div>
   );
 }

@@ -167,6 +167,32 @@ export default function Terminal({ connection, password, onReady, onDisconnect }
 
     setupListeners();
 
+    // Copy on selection
+    term.onSelectionChange(() => {
+      const sel = term.getSelection();
+      if (sel) navigator.clipboard.writeText(sel).catch(() => {});
+    });
+
+    // Paste on right-click
+    const handleCtx = (e: MouseEvent) => {
+      e.preventDefault();
+      navigator.clipboard.readText().then((t) => {
+        invoke("ssh_write", { sessionId, data: Array.from(t).map((c) => c.charCodeAt(0)) }).catch(() => {});
+      }).catch(() => {});
+    };
+    container.addEventListener("contextmenu", handleCtx);
+
+    // Paste on middle-click / double-tap touchpad
+    const handleMousedown = (e: MouseEvent) => {
+      if (e.button === 1) {
+        e.preventDefault();
+        navigator.clipboard.readText().then((t) => {
+          invoke("ssh_write", { sessionId, data: Array.from(t).map((c) => c.charCodeAt(0)) }).catch(() => {});
+        }).catch(() => {});
+      }
+    };
+    container.addEventListener("mousedown", handleMousedown);
+
     term.onData((data) => {
       const bytes = Array.from(data).map((c) => c.charCodeAt(0));
       invoke("ssh_write", { sessionId, data: bytes }).catch(() => {});
