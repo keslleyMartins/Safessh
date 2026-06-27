@@ -39,6 +39,10 @@ pub fn run() {
             commands::save_connections,
             commands::load_connections,
             commands::sftp_list_dir,
+            commands::save_session_log,
+            commands::list_session_logs,
+            commands::get_session_log,
+            commands::delete_session_log,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

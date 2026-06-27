@@ -821,38 +821,43 @@ body,
 .conn-folder-card {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 20px;
+  border-radius: 10px;
+  padding: 14px 12px;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.12s;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  text-align: center;
+  gap: 10px;
 }
 
 .conn-folder-card:hover {
   background: var(--bg-tertiary);
   border-color: var(--accent);
-  transform: translateY(-2px);
 }
 
+.conn-folder-card-icon { display: flex; }
+
 .conn-folder-card-icon svg {
-  width: 32px;
-  height: 32px;
+  width: 22px;
+  height: 22px;
   color: var(--accent);
 }
 
+.conn-folder-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
 .conn-folder-card-name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .conn-folder-card-count {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-muted);
+  margin-top: 1px;
 }
 
 /* ─── Hosts inside folder ──────────────────────────────────────────── */

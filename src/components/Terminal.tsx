@@ -11,6 +11,7 @@ interface Props {
   password?: string;
   onReady: (ok: boolean, msg: string) => void;
   onDisconnect: () => void;
+  onToast?: (msg: string) => void;
 }
 
 type ConnStage = "resolving" | "connecting" | "handshake" | "auth" | "shell" | "connected" | "error";
@@ -25,7 +26,7 @@ const stageLabels: Record<ConnStage, string> = {
   error: "Connection failed",
 };
 
-export default function Terminal({ connection, password, onReady, onDisconnect }: Props) {
+export default function Terminal({ connection, password, onReady, onDisconnect, onToast }: Props) {
   const termRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const unlistenersRef = useRef<UnlistenFn[]>([]);
@@ -36,6 +37,7 @@ export default function Terminal({ connection, password, onReady, onDisconnect }
   const [showOverlay, setShowOverlay] = useState(true);
 
   const connectedRef = useRef(false);
+  const logBufferRef = useRef<string[]>([]);
 
   const cleanup = useCallback(async () => {
     for (const un of unlistenersRef.current) un();
@@ -108,6 +110,8 @@ export default function Terminal({ connection, password, onReady, onDisconnect }
           reportedRef.current = true;
           onReady(true, "Connected");
         }
+        const text = new TextDecoder().decode(new Uint8Array(e.payload));
+        logBufferRef.current.push(text);
         term.write(new Uint8Array(e.payload));
       });
 
@@ -173,7 +177,10 @@ export default function Terminal({ connection, password, onReady, onDisconnect }
     // Copy on selection
     term.onSelectionChange(() => {
       const sel = term.getSelection();
-      if (sel) navigator.clipboard.writeText(sel).catch(() => {});
+      if (sel) {
+        navigator.clipboard.writeText(sel).catch(() => {});
+        if (onToast) onToast("Copied");
+      }
     });
 
     // Paste on right-click
@@ -199,7 +206,8 @@ export default function Terminal({ connection, password, onReady, onDisconnect }
     container.addEventListener("mousedown", handleMousedown);
 
     term.onData((data) => {
-      if (!connectedRef.current) return; // protection: block until connected
+      if (!connectedRef.current) return;
+      logBufferRef.current.push(data);
       const bytes = Array.from(data).map((c) => c.charCodeAt(0));
       invoke("ssh_write", { sessionId, data: bytes }).catch(() => {});
     });
@@ -215,8 +223,14 @@ export default function Terminal({ connection, password, onReady, onDisconnect }
       cleanup();
       invoke("ssh_disconnect", { sessionId }).catch(() => {});
       term.dispose();
+      // Save session log
+      if (logBufferRef.current.length > 0) {
+        const fullLog = logBufferRef.current.join("");
+        const name = connection.name || connection.host;
+        invoke("save_session_log", { connName: name, content: fullLog }).catch(() => {});
+      }
     };
-  }, [connection.name, connection.host, connection.port, connection.username, connection.authMethod, connection.identityFile, connection.password, password, onReady, cleanup]);
+  }, [connection.name, connection.host, connection.port, connection.username, connection.authMethod, connection.identityFile, connection.password, password, onReady, onToast, cleanup]);
 
   const isError = stage === "error";
 

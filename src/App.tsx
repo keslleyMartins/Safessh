@@ -33,7 +33,7 @@ export default function App() {
 
   useEffect(() => {
     (async () => {
-      try { await invoke("save_connections", { data: JSON.stringify(connections.map(({ password, ...rest }) => rest)) }); }
+      try { await invoke("save_connections", { data: JSON.stringify(connections) }); }
       catch (e) { console.error("save", e); }
     })();
   }, [connections]);
@@ -127,7 +127,7 @@ export default function App() {
           activeTabData.type === "sftp" ? (
             <SFTPBrowser key={activeTabData.id} connection={activeTabData.conn} onClose={() => closeTab(activeTabData.id)} />
           ) : (
-            <Terminal key={activeTabData.id} connection={activeTabData.conn} onReady={handleTerminalReady} onDisconnect={() => closeTab(activeTabData.id)} />
+            <Terminal key={activeTabData.id} connection={activeTabData.conn} onReady={handleTerminalReady} onDisconnect={() => closeTab(activeTabData.id)} onToast={(msg) => showToast("success", msg)} />
           )
         ) : (
           <div className="conn-browser">
@@ -166,8 +166,10 @@ export default function App() {
                       });
                     }}>
                       <div className="conn-folder-card-icon"><IconFolder /></div>
-                      <div className="conn-folder-card-name">{g}</div>
-                      <div className="conn-folder-card-count">{conns.length} host{conns.length > 1 ? "s" : ""}</div>
+                      <div className="conn-folder-card-info">
+                        <div className="conn-folder-card-name">{g}</div>
+                        <div className="conn-folder-card-count">{conns.length} host{conns.length > 1 ? "s" : ""}</div>
+                      </div>
                     </div>
                   );
                 })}

@@ -252,12 +252,74 @@ fn connections_path() -> std::path::PathBuf {
 // ── SFTP Commands ──────────────────────────────────────────────────────
 
 #[tauri::command]
-pub fn sftp_list_dir(
+pub async fn sftp_list_dir(
     conn: ConnectionInfo,
     password: String,
     path: String,
 ) -> Result<Vec<sftp::SftpEntry>, String> {
-    sftp::list_dir(&conn, &password, &path)
+    sftp::list_dir(&conn.host, conn.port, &conn.username, &password, &path).await
+}
+
+// ── Session Logs ────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub fn save_session_log(conn_name: String, content: String) -> Result<(), String> {
+    let mut path = log_dir();
+    let _ = std::fs::create_dir_all(&path);
+    let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+    let filename = format!("{}_{}.log", timestamp, conn_name.replace([' ', ':'], "_"));
+    path.push(filename);
+    std::fs::write(&path, &content).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn list_session_logs() -> Result<Vec<serde_json::Value>, String> {
+    let path = log_dir();
+    if !path.exists() { return Ok(vec![]); }
+
+    let mut logs = vec![];
+    if let Ok(entries) = std::fs::read_dir(&path) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if !name.ends_with(".log") { continue; }
+            let meta = entry.metadata().ok();
+            let size = meta.as_ref().map(|m| m.len()).unwrap_or(0);
+            let modified = meta.as_ref()
+                .and_then(|m| m.modified().ok())
+                .map(|t| {
+                    let dt: chrono::DateTime<chrono::Local> = t.into();
+                    dt.format("%Y-%m-%d %H:%M:%S").to_string()
+                })
+                .unwrap_or_default();
+            logs.push(serde_json::json!({
+                "name": name,
+                "size": size,
+                "modified": modified,
+            }));
+        }
+    }
+    logs.sort_by(|a, b| b["modified"].as_str().cmp(&a["modified"].as_str()));
+    Ok(logs)
+}
+
+#[tauri::command]
+pub fn get_session_log(filename: String) -> Result<String, String> {
+    let mut path = log_dir();
+    path.push(&filename);
+    std::fs::read_to_string(&path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_session_log(filename: String) -> Result<(), String> {
+    let mut path = log_dir();
+    path.push(&filename);
+    std::fs::remove_file(&path).map_err(|e| e.to_string())
+}
+
+fn log_dir() -> std::path::PathBuf {
+    let mut path = data_dir_local();
+    path.push("logs");
+    path
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────
