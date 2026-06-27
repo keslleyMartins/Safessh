@@ -4,6 +4,7 @@ import Terminal from "./components/Terminal";
 import ConnectionDialog from "./components/ConnectionDialog";
 import VaultDialog from "./components/VaultDialog";
 import type { ConnectionConfig } from "./lib/types";
+import { IconHome, IconLock, IconUnlock, IconFolder, IconClose, IconSSH, IconTelnet, IconSerial, IconRDP, IconVNC, IconCheck, IconX, IconPlus } from "./lib/icons";
 
 interface Tab { id: string; conn: ConnectionConfig }
 type Toast = { type: "success" | "error"; msg: string } | null;
@@ -77,26 +78,26 @@ export default function App() {
     <div className="app-shell">
       <header className="app-toolbar">
         <div className="toolbar-left">
-          <button className="tb-btn" onClick={() => setShowNewConn(true)}>+ New Connection</button>
+          <button className="tb-btn" onClick={() => setShowNewConn(true)}><IconPlus /> New Connection</button>
         </div>
         <div className="toolbar-center">
           <span className="app-title">SafeSSH</span>
         </div>
         <div className="toolbar-right">
           <button className="tb-btn" onClick={() => setShowVault(true)}>
-            {vaultUnlocked ? "\u{1F512}" : "\u{1F513}"} Vault
+            {vaultUnlocked ? <IconLock /> : <IconUnlock />} Vault
           </button>
         </div>
       </header>
 
       {tabs.length > 0 && (
         <div className="browser-tabs">
-          <button className="browser-tab home-btn" onClick={() => setActiveTab(null)} title="Home">{"\u{1F3E0}"}</button>
+          <button className="browser-tab home-btn" onClick={() => setActiveTab(null)} title="Home"><IconHome /></button>
           {tabs.map((tab) => (
             <div key={tab.id} className={`browser-tab ${activeTab === tab.id ? "active" : ""}`} onClick={() => setActiveTab(tab.id)}>
-              <span className="browser-tab-icon">{"\u{1F512}"}</span>
+              <span className="browser-tab-icon"><IconSSH /></span>
               <span className="browser-tab-title">{tab.conn.name}</span>
-              <button className="browser-tab-close" onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}>&times;</button>
+              <button className="browser-tab-close" onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}><IconClose /></button>
             </div>
           ))}
         </div>
@@ -114,7 +115,7 @@ export default function App() {
 
             {connections.length === 0 ? (
               <div className="conn-browser-empty">
-                <div className="empty-icon">{"\u{1F4C2}"}</div>
+                <div className="empty-icon"><IconFolder /></div>
                 <p>No connections yet</p>
                 <button className="btn btn-primary" onClick={() => setShowNewConn(true)}>+ Create your first connection</button>
               </div>
@@ -123,7 +124,7 @@ export default function App() {
                 {Array.from(groups.entries()).map(([group, conns]) => (
                   <div key={group} className="conn-folder">
                     <div className="conn-folder-header">
-                      <span className="conn-folder-icon">{"\u{1F4C1}"}</span>
+                      <span className="conn-folder-icon"><IconFolder /></span>
                       <span className="conn-folder-name">{group}</span>
                       <span className="conn-folder-count">{conns.length}</span>
                     </div>
@@ -131,7 +132,7 @@ export default function App() {
                       {conns.map((c) => (
                         <div key={c.name} className="conn-browser-item" onClick={() => openTab(c)}>
                           <div className={`conn-browser-icon ${c.protocol}`}>
-                            {c.protocol === "ssh" ? "\u{1F512}" : c.protocol === "telnet" ? "\u{1F4E1}" : c.protocol === "serial" ? "\u{1F4BB}" : c.protocol === "rdp" ? "\u{1F5A5}" : "\u{1F4FA}"}
+                            {c.protocol === "ssh" ? <IconSSH /> : c.protocol === "telnet" ? <IconTelnet /> : c.protocol === "serial" ? <IconSerial /> : c.protocol === "rdp" ? <IconRDP /> : <IconVNC />}
                           </div>
                           <div className="conn-browser-info">
                             <div className="conn-browser-name">{c.name}</div>
@@ -150,7 +151,7 @@ export default function App() {
 
       {showNewConn && <ConnectionDialog onSave={handleCreateConnection} onClose={() => setShowNewConn(false)} />}
       {showVault && <VaultDialog onUnlocked={handleVaultUnlocked} onClose={() => setShowVault(false)} />}
-      {toast && <div className={`toast ${toast.type}`}><span className="toast-icon">{toast.type === "success" ? "\u2713" : "\u2717"}</span><span className="toast-msg">{toast.msg}</span></div>}
+      {toast && <div className={`toast ${toast.type}`}><span className="toast-icon">{toast.type === "success" ? <IconCheck /> : <IconX />}</span><span className="toast-msg">{toast.msg}</span></div>}
     </div>
   );
 }
