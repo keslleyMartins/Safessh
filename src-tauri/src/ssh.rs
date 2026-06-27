@@ -77,7 +77,11 @@ impl SshSession {
                 }
             };
 
-            if let Err(e) = channel.request_pty(false, "xterm-256color", 80, 24, 0, 0, &[]).await {
+            let modes = [
+                (russh::Pty::TTY_OP_ISPEED, 38400u32),
+                (russh::Pty::TTY_OP_OSPEED, 38400u32),
+            ];
+            if let Err(e) = channel.request_pty(false, "xterm-256color", 80, 24, 0, 0, &modes).await {
                 let _ = window.emit(&format!("ssh-error-{}", session_id), format!("PTY error: {}", e));
                 return;
             }
@@ -86,6 +90,9 @@ impl SshSession {
                 let _ = window.emit(&format!("ssh-error-{}", session_id), format!("Shell error: {}", e));
                 return;
             }
+
+            // Send CR to trigger shell prompt
+            let _ = channel.data(&b"\r"[..]).await;
 
             let _ = window.emit(&format!("ssh-stage-{}", session_id), "connected");
 
