@@ -82,7 +82,7 @@ impl SshSession {
                 return;
             }
 
-            if let Err(e) = channel.exec(false, "bash").await {
+            if let Err(e) = channel.exec(false, "bash -i").await {
                 let _ = window.emit(&format!("ssh-error-{}", session_id), format!("Shell error: {}", e));
                 return;
             }
