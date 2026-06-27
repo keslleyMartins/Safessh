@@ -51,18 +51,17 @@ pub struct VaultEntry {
 #[tauri::command]
 pub async fn ssh_connect(
     state: State<'_, AppState>,
+    session_id: String,
     conn: ConnectionInfo,
     password: Option<String>,
     event_window: tauri::Window,
-) -> Result<String, String> {
-    let session_id = uuid::Uuid::new_v4().to_string();
-
+) -> Result<(), String> {
     let mut ssh = SshSession::new(session_id.clone());
-    ssh.connect(&conn, password, event_window.clone()).await?;
+    ssh.connect(&conn, password, event_window.clone());
 
     let mut sessions = state.ssh_sessions.lock().map_err(|e| e.to_string())?;
     sessions.push(ssh);
-    Ok(session_id)
+    Ok(())
 }
 
 #[tauri::command]

@@ -1,19 +1,26 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import ConnectionList from "./components/ConnectionList";
 import Terminal from "./components/Terminal";
 import ConnectionDialog from "./components/ConnectionDialog";
 import VaultDialog from "./components/VaultDialog";
 import type { ConnectionConfig } from "./lib/types";
 
+interface Tab {
+  id: string;
+  conn: ConnectionConfig;
+}
+
+type Toast = { type: "success" | "error"; msg: string } | null;
+
 export default function App() {
   const [connections, setConnections] = useState<ConnectionConfig[]>([]);
-  const [activeSession, setActiveSession] = useState<string | null>(null);
+  const [tabs, setTabs] = useState<Tab[]>([]);
+  const [activeTab, setActiveTab] = useState<string | null>(null);
   const [vaultUnlocked, setVaultUnlocked] = useState(false);
   const [showNewConn, setShowNewConn] = useState(false);
   const [showVault, setShowVault] = useState(false);
+  const [toast, setToast] = useState<Toast>(null);
 
-  // Load connections from disk on startup
   useEffect(() => {
     (async () => {
       try {
@@ -24,25 +31,58 @@ export default function App() {
     })();
   }, []);
 
-  // Save connections whenever they change
   useEffect(() => {
     (async () => {
       try {
         await invoke("save_connections", { data: JSON.stringify(connections, null, 2) });
-      } catch {}
+      } catch (e) { console.error("save failed", e); }
     })();
   }, [connections]);
 
-  const handleConnect = useCallback((name: string) => {
-    setActiveSession(name);
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  const showToast = useCallback((type: "success" | "error", msg: string) => {
+    setToast({ type, msg });
   }, []);
 
-  const handleDisconnect = useCallback(() => {
-    setActiveSession(null);
-  }, []);
+  const handleTerminalReady = useCallback((ok: boolean, msg: string) => {
+    showToast(ok ? "success" : "error", msg);
+  }, [showToast]);
+
+  const openTab = useCallback((conn: ConnectionConfig) => {
+    const existing = tabs.find((t) => t.conn.name === conn.name);
+    if (existing) {
+      setActiveTab(existing.id);
+      return;
+    }
+    const tabId = crypto.randomUUID();
+    setTabs((prev) => [...prev, { id: tabId, conn }]);
+    setActiveTab(tabId);
+  }, [tabs]);
+
+  const closeTab = useCallback((tabId: string) => {
+    setTabs((prev) => {
+      const idx = prev.findIndex((t) => t.id === tabId);
+      const next = prev.filter((t) => t.id !== tabId);
+      if (activeTab === tabId) {
+        if (next.length > 0) {
+          const newIdx = Math.min(idx, next.length - 1);
+          setActiveTab(next[newIdx].id);
+        } else {
+          setActiveTab(null);
+        }
+      }
+      return next;
+    });
+  }, [activeTab]);
 
   const handleCreateConnection = useCallback((cfg: ConnectionConfig) => {
-    setConnections((prev) => [...prev, cfg]);
+    const finalCfg = { ...cfg, name: cfg.name.trim() || cfg.host };
+    setConnections((prev) => [...prev, finalCfg]);
     setShowNewConn(false);
   }, []);
 
@@ -51,16 +91,22 @@ export default function App() {
     setShowVault(false);
   }, []);
 
-  const activeConn = connections.find((c) => c.name === activeSession);
+  // Group connections
+  const groups = new Map<string, ConnectionConfig[]>();
+  for (const c of connections) {
+    const g = c.group?.trim() || "Ungrouped";
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g)!.push(c);
+  }
+
+  const activeTabData = tabs.find((t) => t.id === activeTab);
 
   return (
     <div className="app-shell">
+      {/* ── Toolbar ── */}
       <header className="app-toolbar">
         <div className="toolbar-left">
-          <button className="tb-btn" onClick={() => setShowNewConn(true)}>+ New</button>
-          <button className="tb-btn" onClick={() => activeSession && handleDisconnect()}>
-            Disconnect
-          </button>
+          <button className="tb-btn" onClick={() => setShowNewConn(true)}>+ New Connection</button>
         </div>
         <div className="toolbar-center">
           <span className="app-title">SafeSSH</span>
@@ -72,29 +118,90 @@ export default function App() {
         </div>
       </header>
 
-      <div className="app-body">
-        <aside className="sidebar">
-          <div className="sidebar-header">Connections</div>
-          <ConnectionList
-            connections={connections}
-            onConnect={handleConnect}
-            activeSession={activeSession}
-          />
-        </aside>
-
-        <main className="main-content">
-          {activeConn ? (
-            <Terminal
-              connection={activeConn}
-              onDisconnect={handleDisconnect}
-            />
-          ) : (
-            <div className="welcome">
-              <h1>SafeSSH</h1>
-              <p>Select a connection to start</p>
+      {/* ── Browser-like Tabs ── */}
+      {tabs.length > 0 && (
+        <div className="browser-tabs">
+          {tabs.map((tab) => (
+            <div
+              key={tab.id}
+              className={`browser-tab ${activeTab === tab.id ? "active" : ""}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              <span className="browser-tab-icon">{"\u{1F512}"}</span>
+              <span className="browser-tab-title">{tab.conn.name}</span>
+              <button
+                className="browser-tab-close"
+                onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}
+              >
+                &times;
+              </button>
             </div>
-          )}
-        </main>
+          ))}
+        </div>
+      )}
+
+      {/* ── Content Area ── */}
+      <div className="app-content">
+        {activeTabData ? (
+          <Terminal
+            key={activeTabData.id}
+            connection={activeTabData.conn}
+            onReady={handleTerminalReady}
+            onDisconnect={() => closeTab(activeTabData.id)}
+          />
+        ) : (
+          <div className="conn-browser">
+            <div className="conn-browser-header">
+              <h2>Connections</h2>
+              <span className="conn-count">{connections.length} saved</span>
+            </div>
+
+            {connections.length === 0 ? (
+              <div className="conn-browser-empty">
+                <div className="empty-icon">{"\u{1F4C2}"}</div>
+                <p>No connections yet</p>
+                <button className="btn btn-primary" onClick={() => setShowNewConn(true)}>
+                  + Create your first connection
+                </button>
+              </div>
+            ) : (
+              <div className="conn-browser-grid">
+                {Array.from(groups.entries()).map(([group, conns]) => (
+                  <div key={group} className="conn-folder">
+                    <div className="conn-folder-header">
+                      <span className="conn-folder-icon">{"\u{1F4C1}"}</span>
+                      <span className="conn-folder-name">{group}</span>
+                      <span className="conn-folder-count">{conns.length}</span>
+                    </div>
+                    <div className="conn-folder-items">
+                      {conns.map((c) => (
+                        <div
+                          key={c.name}
+                          className="conn-browser-item"
+                          onClick={() => openTab(c)}
+                        >
+                          <div className={`conn-browser-icon ${c.protocol}`}>
+                            {c.protocol === "ssh" ? "\u{1F512}" :
+                             c.protocol === "telnet" ? "\u{1F4E1}" :
+                             c.protocol === "serial" ? "\u{1F4BB}" :
+                             c.protocol === "rdp" ? "\u{1F5A5}" :
+                             c.protocol === "vnc" ? "\u{1F4FA}" : "\u{1F310}"}
+                          </div>
+                          <div className="conn-browser-info">
+                            <div className="conn-browser-name">{c.name}</div>
+                            <div className="conn-browser-meta">
+                              {c.username ? `${c.username}@` : ""}{c.host}:{c.port}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {showNewConn && (
@@ -109,6 +216,15 @@ export default function App() {
           onUnlocked={handleVaultUnlocked}
           onClose={() => setShowVault(false)}
         />
+      )}
+
+      {toast && (
+        <div className={`toast ${toast.type}`}>
+          <span className="toast-icon">
+            {toast.type === "success" ? "\u2713" : "\u2717"}
+          </span>
+          <span className="toast-msg">{toast.msg}</span>
+        </div>
       )}
     </div>
   );

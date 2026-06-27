@@ -20,7 +20,6 @@
   --accent-hover: #4f5fd0;
   --danger: #ef4444;
   --terminal-bg: #0d0d0f;
-  --sidebar-width: 260px;
   --toolbar-height: 48px;
   --font: -apple-system, "SF Pro Text", "Helvetica Neue", "Segoe UI",
     Roboto, sans-serif;
@@ -45,6 +44,7 @@ body,
   display: flex;
   flex-direction: column;
   height: 100vh;
+  overflow: hidden;
 }
 
 /* ─── Toolbar ───────────────────────────────────────────────────────── */
@@ -103,116 +103,176 @@ body,
   background: var(--bg-hover);
 }
 
-/* ─── Body ──────────────────────────────────────────────────────────── */
-.app-body {
-  display: flex;
+/* ─── Content area ──────────────────────────────────────────────────── */
+.app-content {
   flex: 1;
   overflow: hidden;
-}
-
-/* ─── Sidebar ───────────────────────────────────────────────────────── */
-.sidebar {
-  width: var(--sidebar-width);
-  background: var(--bg-primary);
-  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
 
-.sidebar-header {
-  padding: 12px 16px 8px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
+/* ─── Connection browser (main screen) ──────────────────────────────── */
+.conn-browser {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 32px;
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.conn-browser-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.conn-browser-header h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.conn-count {
+  font-size: 13px;
   color: var(--text-muted);
 }
 
-/* ─── Connection list ───────────────────────────────────────────────── */
-.conn-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 4px 8px;
+.conn-browser-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
 }
 
-.conn-item {
+.conn-browser-empty .empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.conn-browser-empty p {
+  font-size: 15px;
+  margin-bottom: 20px;
+}
+
+.conn-browser-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ─── Folder ────────────────────────────────────────────────────────── */
+.conn-folder {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.conn-folder-header {
   display: flex;
   align-items: center;
-  padding: 8px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.15s;
-  margin-bottom: 2px;
-  gap: 10px;
-}
-
-.conn-item:hover {
+  gap: 8px;
+  padding: 12px 16px;
   background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
 }
 
-.conn-item.active {
+.conn-folder-header:hover {
   background: var(--bg-hover);
 }
 
-.conn-item.active .conn-name {
-  color: #fff;
+.conn-folder-icon {
+  font-size: 16px;
 }
 
-.conn-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
+.conn-folder-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.conn-folder-count {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-primary);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.conn-folder-items {
+  padding: 4px;
+}
+
+/* ─── Connection item in browser ────────────────────────────────────── */
+.conn-browser-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.conn-browser-item:hover {
+  background: var(--bg-hover);
+}
+
+.conn-browser-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 16px;
   flex-shrink: 0;
 }
 
-.conn-icon.ssh {
+.conn-browser-icon.ssh {
   background: #1a3a2a;
   color: #4ade80;
 }
-
-.conn-icon.telnet {
+.conn-browser-icon.telnet {
   background: #0e3a3d;
   color: #2dd4bf;
 }
-
-.conn-icon.serial {
+.conn-browser-icon.serial {
   background: #2e1a4a;
   color: #c084fc;
 }
-
-.conn-icon.rdp {
+.conn-browser-icon.rdp {
   background: #1a2a4a;
   color: #60a5fa;
 }
-
-.conn-icon.vnc {
+.conn-browser-icon.vnc {
   background: #3a2a1a;
   color: #fb923c;
 }
 
-.conn-info {
+.conn-browser-info {
   flex: 1;
   min-width: 0;
 }
 
-.conn-name {
-  font-size: 13px;
+.conn-browser-name {
+  font-size: 14px;
   font-weight: 500;
   color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.conn-meta {
-  font-size: 11px;
+.conn-browser-meta {
+  font-size: 12px;
   color: var(--text-muted);
-  margin-top: 1px;
+  margin-top: 2px;
 }
 
 /* ─── Main content ──────────────────────────────────────────────────── */
@@ -246,57 +306,17 @@ body,
 
 /* ─── Terminal ──────────────────────────────────────────────────────── */
 .terminal-wrapper {
+  position: relative;
+  flex: 1;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  min-height: 0;
 }
 
-.terminal-tab-bar {
-  display: flex;
-  align-items: center;
-  height: 36px;
-  background: var(--bg-primary);
-  border-bottom: 1px solid var(--border);
-  padding: 0 8px;
-  gap: 2px;
-}
-
-.terminal-tab {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 16px;
-  border-radius: 6px 6px 0 0;
-  font-size: 12px;
-  color: var(--text-muted);
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  transition: all 0.15s;
-}
-
-.terminal-tab:hover {
-  color: var(--text-primary);
-  background: var(--bg-tertiary);
-}
-
-.terminal-tab.active {
-  color: var(--text-primary);
-  border-bottom-color: var(--accent);
-}
-
-.terminal-tab-close {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 0 2px;
-  border-radius: 4px;
-  font-size: 14px;
-  line-height: 1;
-}
-
-.terminal-tab-close:hover {
-  color: var(--danger);
+.terminal-container {
+  flex: 1;
+  min-height: 0;
+  padding: 4px;
 }
 
 .terminal-container {
@@ -461,9 +481,17 @@ body,
   animation: spin 0.8s linear infinite;
 }
 
-.conn-overlay.error .conn-spinner {
-  border-top-color: var(--danger);
-  animation: none;
+.conn-error-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--danger);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: bold;
 }
 
 @keyframes spin {
@@ -481,8 +509,147 @@ body,
   color: var(--text-muted);
   max-width: 300px;
   text-align: center;
+  word-break: break-word;
 }
 
-.terminal-wrapper {
-  position: relative;
+/* ─── Browser-like tabs ────────────────────────────────────────────── */
+.browser-tabs {
+  display: flex;
+  align-items: center;
+  height: 38px;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border);
+  padding: 0 8px;
+  gap: 4px;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.browser-tabs::-webkit-scrollbar {
+  height: 0;
+}
+
+.browser-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px 6px 10px;
+  border-radius: 8px 8px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: all 0.15s;
+  max-width: 180px;
+}
+
+.browser-tab:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+.browser-tab.active {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent);
+  background: var(--bg-secondary);
+}
+
+.browser-tab-icon {
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.browser-tab-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.browser-tab-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0 2px;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.browser-tab-close:hover {
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.15);
+}
+
+/* ─── Toast popup ───────────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  z-index: 200;
+  animation: toastSlide 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  max-width: 400px;
+}
+
+.toast.success {
+  background: #1a3a2a;
+  color: #4ade80;
+  border: 1px solid #2d5a3d;
+}
+
+.toast.error {
+  background: #3a1a1a;
+  color: #f87171;
+  border: 1px solid #5a2d2d;
+}
+
+.toast-icon {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+@keyframes toastSlide {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* ─── Folder/group in connection list ─────────────────────────────── */
+.conn-group-header {
+  padding: 10px 12px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.conn-group-header .folder-icon {
+  font-size: 12px;
+}
+
+.conn-group-header .group-count {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--text-muted);
+  opacity: 0.7;
 }

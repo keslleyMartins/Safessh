@@ -14,46 +14,39 @@ const protoIcon: Record<string, string> = {
   vnc: "\u{1F4FA}",
 };
 
-export default function ConnectionList({
-  connections,
-  onConnect,
-  activeSession,
-}: Props) {
+export default function ConnectionList({ connections, onConnect }: Props) {
+  // Group by group field; "Ungrouped" for empty
   const groups = new Map<string, ConnectionConfig[]>();
-
   for (const c of connections) {
-    const g = c.group || "";
+    const g = c.group?.trim() || "Ungrouped";
     if (!groups.has(g)) groups.set(g, []);
     groups.get(g)!.push(c);
   }
 
   return (
     <div className="conn-list">
-      {groups.size === 0 && (
-        <div style={{ padding: "16px", color: "var(--text-muted)", textAlign: "center" }}>
-          No connections yet
+      {connections.length === 0 && (
+        <div style={{ padding: "20px 16px", color: "var(--text-muted)", textAlign: "center", fontSize: 12 }}>
+          No connections yet.
+          <br />
+          Click <strong>+ New</strong> to create one.
         </div>
       )}
+
       {Array.from(groups.entries()).map(([group, conns]) => (
         <div key={group}>
-          {group && (
-            <div
-              style={{
-                padding: "8px 12px 4px",
-                fontSize: "11px",
-                fontWeight: 600,
-                color: "var(--text-muted)",
-                textTransform: "uppercase",
-                letterSpacing: "0.5px",
-              }}
-            >
-              {group}
-            </div>
-          )}
+          {/* Folder header */}
+          <div className="conn-group-header">
+            <span className="folder-icon">{"\u{1F4C1}"}</span>
+            <span>{group}</span>
+            <span className="group-count">{conns.length}</span>
+          </div>
+
+          {/* Connections under folder */}
           {conns.map((c) => (
             <div
               key={c.name}
-              className={`conn-item ${activeSession === c.name ? "active" : ""}`}
+              className="conn-item"
               onClick={() => onConnect(c.name)}
             >
               <div className={`conn-icon ${c.protocol}`}>
@@ -62,7 +55,8 @@ export default function ConnectionList({
               <div className="conn-info">
                 <div className="conn-name">{c.name}</div>
                 <div className="conn-meta">
-                  {c.username}@{c.host}:{c.port}
+                  {c.username ? `${c.username}@` : ""}
+                  {c.host}:{c.port}
                 </div>
               </div>
             </div>
