@@ -26,7 +26,7 @@ pub async fn list_dir(
 ) -> Result<Vec<SftpEntry>, String> {
     let addr: std::net::SocketAddr = format!("{}:{}", host, port)
         .parse()
-        .map_err(|_| format!("Invalid address: {}:{}", host, port))?;
+        .map_err(|_| format!("Invalid address"))?;
 
     let config: std::sync::Arc<client::Config> = client::Config::default().into();
 
@@ -44,136 +44,96 @@ pub async fn list_dir(
         .await
         .map_err(|e| format!("Channel open failed: {}", e))?;
 
-    // Request SFTP subsystem
     channel
         .request_subsystem(false, "sftp")
         .await
         .map_err(|e| format!("SFTP subsystem failed: {}", e))?;
 
-    // SFTP protocol: send SSH_FXP_INIT (version 3)
-    let mut req_id: u32 = 1;
-    let init = build_packet(1, req_id, &3u32.to_be_bytes()); // SSH_FXP_INIT with version 3
+    // ── SFTP INIT (version 3) ──
+    // Packet: uint32 len | byte type(1=INIT) | uint32 version
+    let mut init = Vec::new();
+    init.extend(&(5u32).to_be_bytes());
+    init.push(1);  // SSH_FXP_INIT
+    init.extend(&3u32.to_be_bytes()); // version
     channel.data(&init[..]).await.map_err(|e| e.to_string())?;
 
-    // Read SSH_FXP_VERSION response
-    let ver = read_sftp_packet(&mut channel).await?;
-    if ver[0] != 2 {
-        return Err("Expected SSH_FXP_VERSION".into());
+    let ver = read_packet(&mut channel).await?;
+    if ver[4] != 2 {
+        return Err(format!("Expected SSH_FXP_VERSION(2), got type={}", ver[4]));
     }
 
-    // Send SSH_FXP_OPENDIR
-    req_id += 1;
-    let path_bytes = path.as_bytes();
-    let mut opendir = Vec::new();
-    opendir.push(11u8); // SSH_FXP_OPENDIR
-    opendir.extend(&req_id.to_be_bytes());
-    opendir.extend(&(path_bytes.len() as u32).to_be_bytes());
-    opendir.extend(path_bytes);
-    let opendir_pkt = build_packet(0, 0, &opendir); // type=0 (unused), we already have full data
-    channel.data(&opendir_pkt[..]).await.map_err(|e| e.to_string())?;
+    let mut req_id: u32 = 1;
 
-    // Read SSH_FXP_HANDLE
-    let handle_resp = read_sftp_packet(&mut channel).await?;
-    if handle_resp[0] != 102 {
-        let status_code = u32::from_be_bytes([handle_resp[5], handle_resp[6], handle_resp[7], handle_resp[8]]);
-        let err = match status_code {
-            2 => "No such file",
+    // ── OPENDIR ──
+    // Packet: uint32 len | byte type(11=OPENDIR) | uint32 req_id | string path
+    send_sftp(&mut channel, 11, req_id, &[string_bytes(path)]).await?;
+    let handle_resp = read_packet(&mut channel).await?;
+    if handle_resp[4] != 102 {
+        let status = read_u32(&handle_resp, 9);
+        return Err(match status {
+            2 => "No such file or directory",
             3 => "Permission denied",
             4 => "General failure",
-            _ => "Unknown error",
-        };
-        return Err(err.into());
+            1 => "End of directory",
+            _ => "SFTP error",
+        }.into());
     }
 
-    let handle_len = u32::from_be_bytes([handle_resp[5], handle_resp[6], handle_resp[7], handle_resp[8]]);
-    let handle = &handle_resp[9..9 + handle_len as usize];
+    let handle = read_string(&handle_resp, 9);
 
-    // Send SSH_FXP_READDIR
-    req_id += 1;
-    let mut readdir = Vec::new();
-    readdir.push(12u8); // SSH_FXP_READDIR
-    readdir.extend(&req_id.to_be_bytes());
-    readdir.extend(&(handle.len() as u32).to_be_bytes());
-    readdir.extend(handle);
-    let readdir_pkt = build_packet(0, 0, &readdir);
-    channel.data(&readdir_pkt[..]).await.map_err(|e| e.to_string())?;
-
-    // Read SSH_FXP_NAME response
     let mut entries = Vec::new();
     loop {
-        let resp = read_sftp_packet(&mut channel).await?;
-        match resp[0] {
-            104 => {
-                // SSH_FXP_NAME
-                let count = u32::from_be_bytes([resp[5], resp[6], resp[7], resp[8]]);
-                let mut offset = 9;
-                for _ in 0..count {
-                    let name_len = u32::from_be_bytes([
-                        resp[offset], resp[offset + 1], resp[offset + 2], resp[offset + 3],
-                    ]);
-                    offset += 4;
-                    let name = String::from_utf8_lossy(&resp[offset..offset + name_len as usize]).to_string();
-                    offset += name_len as usize;
+        req_id += 1;
+        // READDIR: type(12) | req_id | string handle
+        send_sftp(&mut channel, 12, req_id, &[string_bytes_for(&handle)]).await?;
+        let resp = read_packet(&mut channel).await?;
+        let ptype = resp[4];
 
-                    // Skip longname (legacy field)
-                    let longname_len = u32::from_be_bytes([
-                        resp[offset], resp[offset + 1], resp[offset + 2], resp[offset + 3],
-                    ]);
-                    offset += 4 + longname_len as usize;
+        if ptype == 101 {
+            // SSH_FXP_STATUS
+            let status = read_u32(&resp, 9);
+            if status == 1 { break; } // EOF
+            if status != 0 { return Err(format!("SFTP error code {}", status)); }
+        }
 
-                    // Parse attributes
-                    let attrs_flags = u32::from_be_bytes([
-                        resp[offset], resp[offset + 1], resp[offset + 2], resp[offset + 3],
-                    ]);
-                    offset += 4;
+        if ptype != 104 { break; } // not SSH_FXP_NAME
 
-                    let mut is_dir = false;
-                    let mut size: i64 = 0;
+        let count = read_u32(&resp, 9) as usize;
+        let mut off = 13;
+        for _ in 0..count {
+            if off + 8 > resp.len() { break; }
+            // Parse filename
+            let name = read_string_at(&resp, off);
+            off += 4 + name.len();
+            if off > resp.len() { break; }
 
-                    if attrs_flags & 0x00000004 != 0 {
-                        // SSH_FILEXFER_ATTR_PERMISSIONS
-                        let perms = u32::from_be_bytes([
-                            resp[offset], resp[offset + 1], resp[offset + 2], resp[offset + 3],
-                        ]);
-                        offset += 4;
-                        is_dir = perms & 0x4000 != 0; // S_IFDIR
-                    }
+            // Skip longname
+            let lnamelen = read_u32(&resp, off) as usize;
+            off += 4 + lnamelen;
+            if off > resp.len() { break; }
 
-                    if attrs_flags & 0x00000001 != 0 {
-                        // SSH_FILEXFER_ATTR_SIZE
-                        size = u64::from_be_bytes([
-                            resp[offset], resp[offset + 1], resp[offset + 2], resp[offset + 3],
-                            resp[offset + 4], resp[offset + 5], resp[offset + 6], resp[offset + 7],
-                        ]) as i64;
-                        offset += 8;
-                    }
+            // Parse attributes
+            if off + 4 > resp.len() { break; }
+            let flags = read_u32(&resp, off);
+            off += 4;
 
-                    if name != "." && name != ".." {
-                        entries.push(SftpEntry { name, is_dir, size });
-                    }
-                }
+            let mut is_dir = false;
+            let mut size: i64 = 0;
 
-                // Send another READDIR to check for more entries
-                req_id += 1;
-                let mut rd = Vec::new();
-                rd.push(12u8);
-                rd.extend(&req_id.to_be_bytes());
-                rd.extend(&(handle.len() as u32).to_be_bytes());
-                rd.extend(handle);
-                let rd_pkt = build_packet(0, 0, &rd);
-                channel.data(&rd_pkt[..]).await.map_err(|e| e.to_string())?;
+            if flags & 1 != 0 { // SSH_FILEXFER_ATTR_SIZE
+                if off + 8 > resp.len() { break; }
+                size = read_u64(&resp, off) as i64;
+                off += 8;
             }
-            101 => {
-                // SSH_FXP_STATUS - check if EOF
-                let status = u32::from_be_bytes([resp[5], resp[6], resp[7], resp[8]]);
-                if status == 1 {
-                    // SSH_FX_EOF
-                    break;
-                }
-                return Err(format!("SFTP error: status={}", status));
+            if flags & 4 != 0 { // SSH_FILEXFER_ATTR_PERMISSIONS
+                if off + 4 > resp.len() { break; }
+                let perms = read_u32(&resp, off);
+                is_dir = perms & 0x4000 != 0;
+                off += 4;
             }
-            _ => {
-                return Err(format!("Unexpected SFTP packet type: {}", resp[0]));
+
+            if name != "." && name != ".." {
+                entries.push(SftpEntry { name, is_dir, size });
             }
         }
     }
@@ -182,28 +142,73 @@ pub async fn list_dir(
     Ok(entries)
 }
 
-fn build_packet(pkt_type: u8, _req_id: u32, data: &[u8]) -> Vec<u8> {
-    let mut pkt = Vec::new();
-    // Length includes: type(1) + data
-    let len = 1 + data.len() as u32;
-    pkt.extend(&len.to_be_bytes());
-    pkt.push(pkt_type);
-    pkt.extend_from_slice(data);
-    pkt
+// ── Packet helpers ─────────────────────────────────────────────────────
+
+fn string_bytes(s: &str) -> Vec<u8> {
+    let b = s.as_bytes();
+    let mut v = Vec::new();
+    v.extend(&(b.len() as u32).to_be_bytes());
+    v.extend(b);
+    v
 }
 
-async fn read_sftp_packet(channel: &mut russh::Channel<russh::client::Msg>) -> Result<Vec<u8>, String> {
+fn string_bytes_for(s: &[u8]) -> Vec<u8> {
+    let mut v = Vec::new();
+    v.extend(&(s.len() as u32).to_be_bytes());
+    v.extend(s);
+    v
+}
+
+async fn send_sftp(channel: &mut russh::Channel<russh::client::Msg>, ptype: u8, req_id: u32, parts: &[Vec<u8>]) -> Result<(), String> {
+    let mut payload = Vec::new();
+    payload.push(ptype);
+    payload.extend(&req_id.to_be_bytes());
+    for p in parts {
+        payload.extend(p);
+    }
+    let mut pkt = Vec::new();
+    pkt.extend(&(payload.len() as u32).to_be_bytes());
+    pkt.extend(payload);
+    channel.data(&pkt[..]).await.map_err(|e| e.to_string())
+}
+
+async fn read_packet(channel: &mut russh::Channel<russh::client::Msg>) -> Result<Vec<u8>, String> {
+    let mut buf = Vec::new();
     loop {
         match channel.wait().await {
             Some(ChannelMsg::Data { ref data }) => {
-                // SFTP packet: uint32 length + byte type + data
-                if data.len() < 5 { continue; }
-                return Ok(data.to_vec());
+                buf.extend_from_slice(data);
+                // Complete SFTP packet: uint32 length + payload
+                while buf.len() >= 5 {
+                    let pkt_len = u32::from_be_bytes([buf[0], buf[1], buf[2], buf[3]]) as usize;
+                    let total = 4 + pkt_len;
+                    if buf.len() >= total {
+                        return Ok(buf[..total].to_vec());
+                    }
+                    break;
+                }
             }
-            Some(ChannelMsg::Eof) | None => {
-                return Err("Connection closed".into());
-            }
+            Some(ChannelMsg::Eof) | None => return Err("Connection closed".into()),
             _ => {}
         }
     }
+}
+
+fn read_u32(buf: &[u8], off: usize) -> u32 {
+    u32::from_be_bytes([buf[off], buf[off+1], buf[off+2], buf[off+3]])
+}
+
+fn read_u64(buf: &[u8], off: usize) -> u64 {
+    u64::from_be_bytes([buf[off], buf[off+1], buf[off+2], buf[off+3],
+                        buf[off+4], buf[off+5], buf[off+6], buf[off+7]])
+}
+
+fn read_string(buf: &[u8], off: usize) -> Vec<u8> {
+    let len = read_u32(buf, off) as usize;
+    buf[off+4..off+4+len].to_vec()
+}
+
+fn read_string_at(buf: &[u8], off: usize) -> String {
+    let len = read_u32(buf, off) as usize;
+    String::from_utf8_lossy(&buf[off+4..off+4+len]).to_string()
 }

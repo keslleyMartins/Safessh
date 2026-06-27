@@ -74,16 +74,24 @@ export default function Terminal({ connection, password, onReady, onDisconnect, 
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
 
-    term.open(container);
-
-    // Force fit after DOM settles
-    const doFit = () => {
-      try { fitAddon.fit(); } catch {}
+    let opened = false;
+    const doOpen = () => {
+      if (opened) return;
+      if (container.clientWidth === 0 || container.clientHeight === 0) return;
+      opened = true;
+      try {
+        term.open(container);
+        fitAddon.fit();
+      } catch {}
     };
-    requestAnimationFrame(() => requestAnimationFrame(doFit));
 
-    const ro = new ResizeObserver(doFit);
+    const ro = new ResizeObserver(() => {
+      if (!opened) doOpen();
+      else try { fitAddon.fit(); } catch {}
+    });
     ro.observe(container);
+    doOpen();
+    if (!opened) requestAnimationFrame(doOpen);
 
     // ── Listeners BEFORE connect (race condition fix) ──
     const setupListeners = async () => {
