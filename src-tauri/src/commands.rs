@@ -50,7 +50,7 @@ pub struct VaultEntry {
 // ── SSH Commands ────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub async fn ssh_connect(
+pub fn ssh_connect(
     state: State<'_, AppState>,
     session_id: String,
     conn: ConnectionInfo,
@@ -252,12 +252,12 @@ fn connections_path() -> std::path::PathBuf {
 // ── SFTP Commands ──────────────────────────────────────────────────────
 
 #[tauri::command]
-pub async fn sftp_list_dir(
+pub fn sftp_list_dir(
     conn: ConnectionInfo,
     password: String,
     path: String,
 ) -> Result<Vec<sftp::SftpEntry>, String> {
-    sftp::list_dir(&conn.host, conn.port, &conn.username, &password, &path).await
+    sftp::list_dir(&conn.host, conn.port, &conn.username, &password, &path)
 }
 
 // ── Session Logs ────────────────────────────────────────────────────────
