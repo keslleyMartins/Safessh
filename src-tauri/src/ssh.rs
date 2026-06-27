@@ -47,6 +47,7 @@ impl SshSession {
         thread::spawn(move || {
             let addr = format!("{}:{}", host, port);
 
+            let _ = window.emit(&format!("ssh-stage-{}", session_id), "connecting");
             let tcp = match std::net::TcpStream::connect(&addr) {
                 Ok(s) => s,
                 Err(e) => {
@@ -63,13 +64,18 @@ impl SshSession {
                 }
             };
 
+            tcp.set_read_timeout(Some(std::time::Duration::from_secs(10))).ok();
+            tcp.set_write_timeout(Some(std::time::Duration::from_secs(10))).ok();
             session.set_tcp_stream(tcp);
-            session.set_blocking(false);
+            session.set_blocking(true);
+
+            let _ = window.emit(&format!("ssh-stage-{}", session_id), "handshake");
             if let Err(e) = session.handshake() {
                 let _ = window.emit(&format!("ssh-error-{}", session_id), format!("Handshake failed: {}", e));
                 return;
             }
 
+            let _ = window.emit(&format!("ssh-stage-{}", session_id), "auth");
             let auth_result = match auth_method.as_str() {
                 "agent" => session.userauth_agent(&username),
                 "key" => {
@@ -107,12 +113,14 @@ impl SshSession {
                 return;
             }
 
+            let _ = window.emit(&format!("ssh-stage-{}", session_id), "shell");
             if let Err(e) = channel.shell() {
                 let _ = window.emit(&format!("ssh-error-{}", session_id), format!("Shell error: {}", e));
                 return;
             }
 
             session.set_blocking(false);
+            let _ = window.emit(&format!("ssh-stage-{}", session_id), "connected");
             let _ = window.emit(&format!("ssh-connected-{}", session_id), ());
 
             let mut buf = [0u8; 32768];

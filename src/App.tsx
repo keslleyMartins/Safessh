@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import ConnectionList from "./components/ConnectionList";
 import Terminal from "./components/Terminal";
 import ConnectionDialog from "./components/ConnectionDialog";
@@ -10,33 +11,53 @@ export default function App() {
   const [activeSession, setActiveSession] = useState<string | null>(null);
   const [vaultUnlocked, setVaultUnlocked] = useState(false);
   const [showNewConn, setShowNewConn] = useState(false);
-  const [showVault, setShowVault] = useState(!vaultUnlocked);
+  const [showVault, setShowVault] = useState(false);
 
-  function handleConnect(name: string) {
+  // Load connections from disk on startup
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = await invoke<string>("load_connections");
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setConnections(parsed);
+      } catch {}
+    })();
+  }, []);
+
+  // Save connections whenever they change
+  useEffect(() => {
+    (async () => {
+      try {
+        await invoke("save_connections", { data: JSON.stringify(connections, null, 2) });
+      } catch {}
+    })();
+  }, [connections]);
+
+  const handleConnect = useCallback((name: string) => {
     setActiveSession(name);
-  }
+  }, []);
 
-  function handleDisconnect() {
+  const handleDisconnect = useCallback(() => {
     setActiveSession(null);
-  }
+  }, []);
 
-  function handleCreateConnection(cfg: ConnectionConfig) {
+  const handleCreateConnection = useCallback((cfg: ConnectionConfig) => {
     setConnections((prev) => [...prev, cfg]);
     setShowNewConn(false);
-  }
+  }, []);
 
-  function handleVaultUnlocked() {
+  const handleVaultUnlocked = useCallback(() => {
     setVaultUnlocked(true);
     setShowVault(false);
-  }
+  }, []);
+
+  const activeConn = connections.find((c) => c.name === activeSession);
 
   return (
     <div className="app-shell">
       <header className="app-toolbar">
         <div className="toolbar-left">
-          <button className="tb-btn" onClick={() => setShowNewConn(true)}>
-            + New
-          </button>
+          <button className="tb-btn" onClick={() => setShowNewConn(true)}>+ New</button>
           <button className="tb-btn" onClick={() => activeSession && handleDisconnect()}>
             Disconnect
           </button>
@@ -46,7 +67,7 @@ export default function App() {
         </div>
         <div className="toolbar-right">
           <button className="tb-btn" onClick={() => setShowVault(true)}>
-            {vaultUnlocked ? "\u{1F512} Vault" : "\u{1F513} Unlock"}
+            {vaultUnlocked ? "\u{1F512}" : "\u{1F513}"} Vault
           </button>
         </div>
       </header>
@@ -62,9 +83,9 @@ export default function App() {
         </aside>
 
         <main className="main-content">
-          {activeSession ? (
+          {activeConn ? (
             <Terminal
-              connection={connections.find((c) => c.name === activeSession)!}
+              connection={activeConn}
               onDisconnect={handleDisconnect}
             />
           ) : (

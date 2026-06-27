@@ -11,6 +11,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .manage(commands::AppState::new())
         .setup(|app| {
             #[cfg(debug_assertions)]
             {
@@ -34,6 +35,8 @@ pub fn run() {
             commands::serial_connect,
             commands::serial_write,
             commands::serial_disconnect,
+            commands::save_connections,
+            commands::load_connections,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

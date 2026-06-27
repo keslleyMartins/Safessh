@@ -223,8 +223,66 @@ pub async fn serial_disconnect(
     Ok(())
 }
 
+// ── Connection persistence ──────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn save_connections(data: String) -> Result<(), String> {
+    let path = connections_path();
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(&path, &data).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn load_connections() -> Result<String, String> {
+    let path = connections_path();
+    if !path.exists() {
+        return Ok("[]".into());
+    }
+    std::fs::read_to_string(&path).map_err(|e| e.to_string())
+}
+
+fn connections_path() -> std::path::PathBuf {
+    let mut path = data_dir_local();
+    path.push("connections.json");
+    path
+}
+
 // ── Helpers ─────────────────────────────────────────────────────────────
 
 fn vault_exists() -> bool {
     crate::vault::vault_file_path().exists()
+}
+
+fn data_dir_local() -> std::path::PathBuf {
+    #[cfg(target_os = "linux")]
+    {
+        std::env::var("XDG_DATA_HOME")
+            .ok()
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| {
+                std::env::var("HOME")
+                    .map(|h| std::path::PathBuf::from(h).join(".local/share/SafeSSH"))
+                    .unwrap_or_default()
+            })
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::env::var("HOME")
+            .map(|h| std::path::PathBuf::from(h).join("Library/Application Support/SafeSSH"))
+            .unwrap_or_default()
+    }
+    #[cfg(target_os = "windows")]
+    {
+        std::env::var("APPDATA")
+            .map(|a| std::path::PathBuf::from(a).join("SafeSSH"))
+            .unwrap_or_default()
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
+    {
+        std::env::var("HOME")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_default()
+    }
 }
