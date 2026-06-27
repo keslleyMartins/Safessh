@@ -2,6 +2,7 @@ mod commands;
 mod ssh;
 mod vault;
 mod serial;
+mod sftp;
 
 use tauri::Manager;
 
@@ -37,6 +38,7 @@ pub fn run() {
             commands::serial_disconnect,
             commands::save_connections,
             commands::load_connections,
+            commands::sftp_list_dir,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

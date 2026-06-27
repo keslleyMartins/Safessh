@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::ssh::SshSession;
 use crate::vault::Vault;
 use crate::serial::SerialSession;
+use crate::sftp;
 
 // ── App State ───────────────────────────────────────────────────────────
 
@@ -246,6 +247,17 @@ fn connections_path() -> std::path::PathBuf {
     let mut path = data_dir_local();
     path.push("connections.json");
     path
+}
+
+// ── SFTP Commands ──────────────────────────────────────────────────────
+
+#[tauri::command]
+pub fn sftp_list_dir(
+    conn: ConnectionInfo,
+    password: String,
+    path: String,
+) -> Result<Vec<sftp::SftpEntry>, String> {
+    sftp::list_dir(&conn, &password, &path)
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────

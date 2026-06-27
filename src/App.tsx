@@ -2,10 +2,11 @@ import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import Terminal from "./components/Terminal";
 import ConnectionDialog from "./components/ConnectionDialog";
+import SFTPBrowser from "./components/SFTPBrowser";
 import VaultDialog from "./components/VaultDialog";
 import ContextMenu from "./components/ContextMenu";
 import type { ConnectionConfig } from "./lib/types";
-import { IconHome, IconLock, IconUnlock, IconFolder, IconClose, IconSSH, IconTelnet, IconSerial, IconRDP, IconVNC, IconCheck, IconX, IconPlus, IconEdit, IconTrash, IconMove } from "./lib/icons";
+import { IconHome, IconLock, IconUnlock, IconFolder, IconClose, IconSSH, IconTelnet, IconSerial, IconRDP, IconVNC, IconCheck, IconX, IconPlus, IconEdit, IconTrash, IconMove, IconBack } from "./lib/icons";
 
 interface Tab { id: string; conn: ConnectionConfig; type: "terminal" | "sftp" }
 type Toast = { type: "success" | "error"; msg: string } | null;
@@ -21,6 +22,7 @@ export default function App() {
   const [showVault, setShowVault] = useState(false);
   const [toast, setToast] = useState<Toast>(null);
   const [ctxMenu, setCtxMenu] = useState<CtxMenu>(null);
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -44,9 +46,6 @@ export default function App() {
 
   const showToast = useCallback((type: "success" | "error", msg: string) => setToast({ type, msg }), []);
   const handleTerminalReady = useCallback((ok: boolean, msg: string) => showToast(ok ? "success" : "error", msg), [showToast]);
-
-  // Group names (updated on connections change)
-  // groups are derived from connections directly in render
 
   const openTab = useCallback((conn: ConnectionConfig, type: "terminal" | "sftp" = "terminal") => {
     const existing = tabs.find((t) => t.conn.name === conn.name && t.type === type);
@@ -76,18 +75,12 @@ export default function App() {
     setShowNewConn(false);
   }, [editConn]);
 
-  const deleteConnection = useCallback((name: string) => {
-    setConnections((p) => p.filter((c) => c.name !== name));
-  }, []);
-
-  const moveToGroup = useCallback((connName: string, newGroup: string) => {
-    setConnections((p) => p.map((c) => c.name === connName ? { ...c, group: newGroup } : c));
-  }, []);
-
+  const deleteConnection = useCallback((name: string) => setConnections((p) => p.filter((c) => c.name !== name)), []);
+  const moveToGroup = useCallback((connName: string, newGroup: string) => setConnections((p) => p.map((c) => c.name === connName ? { ...c, group: newGroup } : c)), []);
   const deleteGroup = useCallback((groupName: string) => {
     setConnections((p) => p.map((c) => (c.group === groupName || (!c.group?.trim() && groupName === "Ungrouped")) ? { ...c, group: "" } : c));
+    setSelectedFolder(null);
   }, []);
-
   const handleVaultUnlocked = useCallback(() => { setVaultUnlocked(true); setShowVault(false); }, []);
 
   // Group connections
@@ -97,6 +90,8 @@ export default function App() {
     if (!grouped.has(g)) grouped.set(g, []);
     grouped.get(g)!.push(c);
   }
+  const folderNames = Array.from(grouped.keys()).sort();
+  const currentConns = selectedFolder ? (grouped.get(selectedFolder) || []) : [];
 
   const activeTabData = tabs.find((t) => t.id === activeTab);
 
@@ -110,15 +105,13 @@ export default function App() {
           <span className="app-title">SafeSSH</span>
         </div>
         <div className="toolbar-right">
-          <button className="tb-btn" onClick={() => setShowVault(true)}>
-            {vaultUnlocked ? <IconLock /> : <IconUnlock />} Vault
-          </button>
+          <button className="tb-btn" onClick={() => setShowVault(true)}>{vaultUnlocked ? <IconLock /> : <IconUnlock />} Vault</button>
         </div>
       </header>
 
       {tabs.length > 0 && (
         <div className="browser-tabs">
-          <button className="browser-tab home-btn" onClick={() => setActiveTab(null)} title="Home"><IconHome /></button>
+          <button className="browser-tab home-btn" onClick={() => { setActiveTab(null); setSelectedFolder(null); }} title="Home"><IconHome /></button>
           {tabs.map((tab) => (
             <div key={tab.id} className={`browser-tab ${activeTab === tab.id ? "active" : ""}`} onClick={() => setActiveTab(tab.id)}>
               <span className="browser-tab-icon">{tab.type === "sftp" ? <IconFolder /> : <IconSSH />}</span>
@@ -132,19 +125,25 @@ export default function App() {
       <div className="app-content">
         {activeTabData ? (
           activeTabData.type === "sftp" ? (
-            <div className="sftp-placeholder">
-              <IconFolder />
-              <p>SFTP for {activeTabData.conn.name}</p>
-              <span>Coming soon — file browser</span>
-            </div>
+            <SFTPBrowser key={activeTabData.id} connection={activeTabData.conn} onClose={() => closeTab(activeTabData.id)} />
           ) : (
             <Terminal key={activeTabData.id} connection={activeTabData.conn} onReady={handleTerminalReady} onDisconnect={() => closeTab(activeTabData.id)} />
           )
         ) : (
           <div className="conn-browser">
             <div className="conn-browser-header">
-              <h2>Connections</h2>
-              <span className="conn-count">{connections.length} saved</span>
+              {selectedFolder ? (
+                <>
+                  <button className="tb-btn" onClick={() => setSelectedFolder(null)}><IconBack /> Folders</button>
+                  <h2 style={{ marginLeft: 12 }}>{selectedFolder}</h2>
+                  <span className="conn-count">{currentConns.length}</span>
+                </>
+              ) : (
+                <>
+                  <h2>Folders</h2>
+                  <span className="conn-count">{folderNames.length} groups</span>
+                </>
+              )}
             </div>
 
             {connections.length === 0 ? (
@@ -153,55 +152,54 @@ export default function App() {
                 <p>No connections yet</p>
                 <button className="btn btn-primary" onClick={() => setShowNewConn(true)}>+ Create your first connection</button>
               </div>
-            ) : (
+            ) : !selectedFolder ? (
+              /* ── Folder grid ── */
               <div className="conn-browser-grid">
-                {Array.from(grouped.entries()).map(([group, conns]) => (
-                  <div key={group} className="conn-folder">
-                    <div className="conn-folder-header" onContextMenu={(e) => {
+                {folderNames.map((g) => {
+                  const conns = grouped.get(g)!;
+                  return (
+                    <div key={g} className="conn-folder-card" onClick={() => setSelectedFolder(g)} onContextMenu={(e) => {
+                      e.preventDefault();
+                      setCtxMenu({
+                        x: e.clientX, y: e.clientY,
+                        items: [{ label: "Delete Group", icon: <IconTrash />, onClick: () => deleteGroup(g), danger: true }],
+                      });
+                    }}>
+                      <div className="conn-folder-card-icon"><IconFolder /></div>
+                      <div className="conn-folder-card-name">{g}</div>
+                      <div className="conn-folder-card-count">{conns.length} host{conns.length > 1 ? "s" : ""}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              /* ── Hosts in folder ── */
+              <div className="conn-browser-hosts">
+                {currentConns.map((c) => (
+                  <div key={c.name} className="conn-browser-item"
+                    onClick={() => openTab(c)}
+                    onContextMenu={(e) => {
                       e.preventDefault();
                       setCtxMenu({
                         x: e.clientX, y: e.clientY,
                         items: [
-                          { label: "Delete Group", icon: <IconTrash />, onClick: () => deleteGroup(group), danger: true },
+                          { label: "Connect", icon: <IconSSH />, onClick: () => openTab(c) },
+                          { label: "SFTP", icon: <IconFolder />, onClick: () => openTab(c, "sftp") },
+                          { divider: true, label: "", onClick: () => {} },
+                          { label: "Edit", icon: <IconEdit />, onClick: () => { setEditConn(c); setShowNewConn(true); } },
+                          { label: "Move to...", icon: <IconMove />, onClick: () => { const g = prompt("Move to group:", c.group || ""); if (g !== null) moveToGroup(c.name, g.trim() || ""); }},
+                          { divider: true, label: "", onClick: () => {} },
+                          { label: "Delete", icon: <IconTrash />, onClick: () => deleteConnection(c.name), danger: true },
                         ]
                       });
-                    }}>
-                      <span className="conn-folder-icon"><IconFolder /></span>
-                      <span className="conn-folder-name">{group}</span>
-                      <span className="conn-folder-count">{conns.length}</span>
+                    }}
+                  >
+                    <div className={`conn-browser-icon ${c.protocol}`}>
+                      {c.protocol === "ssh" ? <IconSSH /> : c.protocol === "telnet" ? <IconTelnet /> : c.protocol === "serial" ? <IconSerial /> : c.protocol === "rdp" ? <IconRDP /> : <IconVNC />}
                     </div>
-                    <div className="conn-folder-items">
-                      {conns.map((c) => (
-                        <div key={c.name} className="conn-browser-item"
-                          onClick={() => openTab(c)}
-                          onContextMenu={(e) => {
-                            e.preventDefault();
-                            setCtxMenu({
-                              x: e.clientX, y: e.clientY,
-                              items: [
-                                { label: "Connect", icon: <IconSSH />, onClick: () => openTab(c) },
-                                { label: "SFTP", icon: <IconFolder />, onClick: () => openTab(c, "sftp") },
-                                { divider: true, label: "", onClick: () => {} },
-                                { label: "Edit", icon: <IconEdit />, onClick: () => { setEditConn(c); setShowNewConn(true); } },
-                                { label: "Move to...", icon: <IconMove />, onClick: () => {
-                                  const newGroup = prompt("Move to group:", c.group || "");
-                                  if (newGroup !== null) moveToGroup(c.name, newGroup.trim() || "");
-                                }},
-                                { divider: true, label: "", onClick: () => {} },
-                                { label: "Delete", icon: <IconTrash />, onClick: () => deleteConnection(c.name), danger: true },
-                              ]
-                            });
-                          }}
-                        >
-                          <div className={`conn-browser-icon ${c.protocol}`}>
-                            {c.protocol === "ssh" ? <IconSSH /> : c.protocol === "telnet" ? <IconTelnet /> : c.protocol === "serial" ? <IconSerial /> : c.protocol === "rdp" ? <IconRDP /> : <IconVNC />}
-                          </div>
-                          <div className="conn-browser-info">
-                            <div className="conn-browser-name">{c.name}</div>
-                            <div className="conn-browser-meta">{c.username ? `${c.username}@` : ""}{c.host}:{c.port}</div>
-                          </div>
-                        </div>
-                      ))}
+                    <div className="conn-browser-info">
+                      <div className="conn-browser-name">{c.name}</div>
+                      <div className="conn-browser-meta">{c.username ? `${c.username}@` : ""}{c.host}:{c.port}</div>
                     </div>
                   </div>
                 ))}
@@ -212,9 +210,7 @@ export default function App() {
       </div>
 
       {ctxMenu && <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />}
-
       {showNewConn && <ConnectionDialog onSave={handleCreateConnection} onClose={() => { setShowNewConn(false); setEditConn(null); }} editConfig={editConn} />}
-
       {showVault && <VaultDialog onUnlocked={handleVaultUnlocked} onClose={() => setShowVault(false)} />}
       {toast && <div className={`toast ${toast.type}`}><span className="toast-icon">{toast.type === "success" ? <IconCheck /> : <IconX />}</span><span className="toast-msg">{toast.msg}</span></div>}
     </div>
